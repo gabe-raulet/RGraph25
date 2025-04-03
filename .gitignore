@@ -1,0 +1,10 @@
+datasets/covtype.fvecs
+datasets/mnist.fvecs
+datasets/tinyImages100k.fvecs
+datasets/twitter.fvecs
+rgraph
+rgraph_omp
+rgraph_mpi
+main
+*.swp
+*.dSYM
