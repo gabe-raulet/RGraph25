@@ -110,6 +110,7 @@ int main(int argc, char *argv[])
 
     t += omp_get_wtime();
     tottime += t;
+    double tree_time = t;
 
     #ifdef LOG
     fmt::print("[time={:.3f}] built cover tree [vertices={}]\n", t, tree.num_vertices());
@@ -138,6 +139,7 @@ int main(int argc, char *argv[])
 
     t += omp_get_wtime();
     tottime += t;
+    double graph_time = t;
 
     stats["times"]["build_epsilon_graph"] = t;
 
@@ -151,8 +153,8 @@ int main(int argc, char *argv[])
     #endif
 
     #ifndef LOG
-    if (header) fmt::print("prog\tfilename\tcover\tleaf\tnum_points\tthreads\ttime\tnum_edges\tdensity\tqueries_per_second\tedges_per_second\n");
-    fmt::print("rgraph\t{}\t{:.2f}\t{}\t{}\t{}\t{:.3f}\t{}\t{:.1f}\t{:.1f}\t{:.1f}\n", points_fname, covering_factor, leaf_size, n, nthreads, tottime, n_edges, density, n/tottime, n_edges/tottime);
+    if (header) fmt::print("prog\tfilename\tcover\tleaf\tnum_points\tthreads\ttime\ttree_time\tgraph_time\tnum_edges\tdensity\tqueries_per_second\tedges_per_second\n");
+    fmt::print("rgraph\t{}\t{:.2f}\t{}\t{}\t{}\t{:.3f}\t{:.3f}\t{:.3f}\t{}\t{:.1f}\t{:.1f}\t{:.1f}\n", points_fname, covering_factor, leaf_size, n, nthreads, tottime, tree_time, graph_time, n_edges, density, n/tottime, n_edges/tottime);
     #endif
 
     stats["times"]["total"] = tottime;
