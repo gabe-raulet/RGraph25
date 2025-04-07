@@ -25,6 +25,7 @@ using json = nlohmann::json;
 
 #include "utils.h"
 #include "ctree.h"
+#include "voronoi.h"
 
 Distance distance;
 
@@ -90,6 +91,24 @@ int main(int argc, char *argv[])
 
     Index n = mypoints.size();
     Index m = num_sites;
+
+    /*
+     * Build Voronoi diagram
+     */
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    t = -MPI_Wtime();
+
+    VoronoiDiagram diagram(mypoints.data(), mypoints.size(), myoffset, MPI_COMM_WORLD);
+
+    if (random_sites) diagram.build_random_diagram(m);
+    else diagram.build_greedy_diagram(m);
+
+    t += MPI_Wtime();
+    MPI_Reduce(&t, &maxtime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+    tottime += maxtime;
+
+    if (!myrank) fmt::print("[time={:.3f}] built r-net Voronoi diagram [sep={:.3f},num_sites={},farthest={}]\n", maxtime, diagram.get_radius(), diagram.num_sites(), diagram.get_farthest());
 
     MPI_Finalize();
     return 0;
