@@ -5,4 +5,5 @@ datasets/covtype.fvecs
 sift
 points
 rgraph
+rgraph_mpi
 *.tar.gz

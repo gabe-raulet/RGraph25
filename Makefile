@@ -22,10 +22,13 @@ ifeq ($(LOG),1)
 FLAGS+=-DLOG
 endif
 
-all: rgraph
+all: rgraph rgraph_mpi
 
 rgraph: rgraph.cpp
 	$(MPI_COMPILER) -o $@ -DDIM_SIZE=$(D) $(FLAGS) $(INCS) $<
 
+rgraph_mpi: rgraph_mpi.cpp
+	$(MPI_COMPILER) -o $@ -DDIM_SIZE=$(D) $(FLAGS) $(INCS) $<
+
 clean:
-	rm -rf rgraph *.out *.dSYM
+	rm -rf rgraph rgraph_mpi *.out *.dSYM
