@@ -3,4 +3,6 @@ datasets/tinyImages100k.fvecs
 datasets/twitter.fvecs
 datasets/covtype.fvecs
 sift
+points
+rgraph
 *.tar.gz
