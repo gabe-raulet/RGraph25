@@ -1,0 +1,51 @@
+The datasets in the the izbicki15/small and izbicki15/large folders were curated from the paper "Faster Cover Trees" (Izbicki, Shelton, 2015).
+
+artificial40.fvecs - (10000, 40)
+
+    * epsilon=4.5; edges=10028; density=1.00; sparsity=0.0001;
+    * epsilon=5.0; edges=10840; density=1.01; sparsity=0.0001;
+    * epsilon=5.5; edges=21772; density=2.18; sparsity=0.0002;
+    * epsilon=6.0; edges=112578; density=11.26; sparsity=0.0011;
+    * epsilon=6.5; edges=612050; density=61.21; sparsity=0.0061;
+    * epsilon=7.0; edges=2545872; density=254.59; sparsity=0.025;
+    * epsilon=7.5; edges=7887954; density=788.80; sparsity=0.0789;
+    * epsilon=8.0; edges=18801454; density=1880.15; sparsity=0.189;
+
+corel.fvecs - (68040, 32)
+
+    * epsilon=0.100; edges=1635650; density=24.04; sparsity=0.00035;
+    * epsilon=0.125; edges=3903468; density=57.37; sparsity=0.00084;
+    * epsilon=0.150; edges=9011336; density=132.44; sparsity=0.0019;
+    * epsilon=0.175; edges=19213592; density=282.39; sparsity=0.0042;
+    * epsilon=0.200; edges=37559190; density=552.02; sparsity=0.0081;
+
+faces.fvecs - (10304, 20)
+
+    * epsilon=10; edges=10514; density=1.02; sparsity=9.9e-5;
+    * epsilon=20; edges=31554; density=3.06; sparsity=0.0003;
+    * epsilon=30; edges=74008; density=7.18; sparsity=0.0007;
+    * epsilon=40; edges=153218; density=14.87; sparsity=0.0014;
+    * epsilon=50; edges=312664; density=30.34; sparsity=0.0029;
+    * epsilon=60; edges=621244; density=60.29; sparsity=0.0058;
+    * epsilon=70; edges=1148272; density=111.44; sparsity=0.011;
+    * epsilon=80; edges=1941836; density=188.45; sparsity=0.018;
+    * epsilon=90; edges=3039992; density=295.03; sparsity=0.029;
+    * epsilon=100; edges=4493514; density=436.10; sparsity=0.042;
+
+covtype.fvecs - (581012, 55)
+
+    * epsilon=100; edges=16396092; density=28.22; sparsity=4.85e-5;
+    * epsilon=200; edges=157365576; density=270.85; sparsity=0.00047;
+    * epsilon=300; edges=772129302; density=1328.94; sparsity=0.0023;
+    * epsilon=400; edges=2438880022; density=4197.64; sparsity=0.0072;
+
+mnist.fvecs - (70000, 784)
+
+    * epsilon=800; edges=1750398; density=25.01; sparsity=0.00036;
+    * epsilon=825; edges=2068986; density=29.56; sparsity=0.00042;
+    * epsilon=850; edges=2428902; density=34.70; sparsity=0.00050;
+    * epsilon=875; edges=2831120; density=40.44; sparsity=0.00058;
+
+tinyImages100k.fvecs - (100000, 384)
+
+twitter.fvecs - (583250, 78)

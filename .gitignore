@@ -1,0 +1,6 @@
+datasets/mnist.fvecs
+datasets/tinyImages100k.fvecs
+datasets/twitter.fvecs
+datasets/covtype.fvecs
+sift
+*.tar.gz
