@@ -124,20 +124,31 @@ int main(int argc, char *argv[])
     {
         t = -omp_get_wtime();
 
-        FILE *f = fopen(graph_fname, "w");
+        std::stringstream ss;
+        ss << n << " " << n_edges << "\n";
 
-        fprintf(f, "%lld %lld\n", n, n_edges);
-
-        for (Index i = 0; i < n; ++i)
+        #pragma omp parallel
         {
-            std::sort(graph[i].begin(), graph[i].end());
+            std::stringstream myss;
 
-            for (Index j : graph[i])
+            #pragma omp for nowait
+            for (Index i = 0; i < n; ++i)
             {
-                fprintf(f, "%lld %lld\n", i+1, j+1);
+                for (Index j : graph[i])
+                {
+                    myss << (i+1) << " " << (j+1) << "\n";
+                }
             }
+
+            #pragma omp critical
+            ss << myss.str();
         }
 
+        std::string s = ss.str();
+        const char *buf = s.c_str();
+
+        FILE *f = fopen(graph_fname, "w");
+        fprintf(f, "%s", buf);
         fclose(f);
 
         t += omp_get_wtime();
