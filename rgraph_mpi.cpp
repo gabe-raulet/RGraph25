@@ -41,7 +41,7 @@ int main(int argc, char *argv[])
     Index num_sites;
 
     Index leaf_size = 50;
-    Real covering_factor = 1.8;
+    Real cover = 1.8;
     bool random_sites = false;
     const char *graph_fname = NULL;
 
@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
         if (isroot)
         {
             fprintf(stderr, "Usage: %s [options] <points> <epsilon> <num_sites>\n", argv[0]);
-            fprintf(stderr, "Options: -c FLOAT  covering factor [%.2f]\n", covering_factor);
+            fprintf(stderr, "Options: -c FLOAT  covering factor [%.2f]\n", cover);
             fprintf(stderr, "         -l INT    leaf size [%lu]\n", (size_t)leaf_size);
             fprintf(stderr, "         -o FILE   graph output file\n");
             fprintf(stderr, "         -R        choose sites randomly\n");
@@ -68,7 +68,7 @@ int main(int argc, char *argv[])
     int c;
     while ((c = getopt(argc, argv, "c:l:o:Rh")) >= 0)
     {
-        if      (c == 'c') covering_factor = atof(optarg);
+        if      (c == 'c') cover = atof(optarg);
         else if (c == 'l') leaf_size = atoi(optarg);
         else if (c == 'o') graph_fname = optarg;
         else if (c == 'R') random_sites = true;
@@ -103,6 +103,8 @@ int main(int argc, char *argv[])
 
     if (random_sites) diagram.build_random_diagram(m);
     else diagram.build_greedy_diagram(m);
+
+    diagram.build_replication_tree(cover, leaf_size);
 
     t += MPI_Wtime();
     MPI_Reduce(&t, &maxtime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);

@@ -191,3 +191,7 @@ void VoronoiDiagram::build_greedy_diagram(Index m)
     MPI_Op_free(&MPI_ARGMAX);
 }
 
+void VoronoiDiagram::build_replication_tree(Real covering_factor, Index leaf_size)
+{
+    reptree.build(site_points, covering_factor, leaf_size);
+}

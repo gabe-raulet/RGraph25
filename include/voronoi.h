@@ -14,6 +14,7 @@ class VoronoiDiagram
 
         void build_random_diagram(Index m);
         void build_greedy_diagram(Index m);
+        void build_replication_tree(Real cover, Index leaf_size);
 
         Index num_points() const { return mysize; }
         Index num_sites() const { return sites.size(); }
