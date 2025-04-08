@@ -242,6 +242,42 @@ int main(int argc, char *argv[])
 
     if (!myrank) fmt::print("[time={:.3f}] built epsilon graph [density={:.3f},sparsity={:.3f},edges={}]\n", maxtime, density, sparsity, n_edges);
 
+    if (graph_fname)
+    {
+        std::stringstream ss;
+
+        if (!myrank)
+        {
+            ss << totsize << " " << n_edges << "\n";
+        }
+
+        for (Index k = 0; k < myids.size(); ++k)
+        {
+            Index i = myids[k];
+
+            for (Index j : mygraph[k])
+            {
+                ss << i+1 << " " << j+1 << "\n";
+            }
+        }
+
+        std::string s = ss.str();
+        const char *mybuf = s.c_str();
+        int count = s.size();
+
+        MPI_Offset mysize = count;
+        MPI_Offset fileoffset;
+
+        MPI_Exscan(&mysize, &fileoffset, 1, MPI_OFFSET, MPI_SUM, MPI_COMM_WORLD);
+        if (!myrank) fileoffset = 0;
+
+        MPI_File fh;
+        MPI_File_open(MPI_COMM_WORLD, graph_fname, MPI_MODE_CREATE | MPI_MODE_WRONLY, MPI_INFO_NULL, &fh);
+
+        MPI_File_write_at_all(fh, fileoffset, mybuf, count, MPI_CHAR, MPI_STATUS_IGNORE);
+        MPI_File_close(&fh);
+    }
+
     MPI_Finalize();
     return 0;
 }
