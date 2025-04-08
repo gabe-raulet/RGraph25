@@ -195,3 +195,66 @@ void VoronoiDiagram::build_replication_tree(Real covering_factor, Index leaf_siz
 {
     reptree.build(site_points, covering_factor, leaf_size);
 }
+
+void VoronoiDiagram::find_ghost_neighbors(IndexVector& neighbors, Index query, Real epsilon) const
+{
+    reptree.range_query(neighbors, mypoints[query], mydists[query] + 2*epsilon);
+
+    auto it = std::remove_if(neighbors.begin(), neighbors.end(), [&](Index id) { return id == mycells[query]; });
+    neighbors.erase(it, neighbors.end());
+}
+
+void VoronoiDiagram::compute_my_tree_points(IndexVector& mytreeids, IndexVector& mytreeptrs) const
+{
+    Index m = num_sites();
+
+    mytreeptrs.resize(m);
+    std::exclusive_scan(my_cell_sizes.begin(), my_cell_sizes.end(), mytreeptrs.begin(), static_cast<Index>(0));
+    mytreeptrs.push_back(my_cell_sizes.back() + mytreeptrs.back());
+    mytreeids.resize(mytreeptrs.back());
+
+    IndexVector ptrs = mytreeptrs;
+
+    for (Index p = 0; p < mysize; ++p)
+    {
+        mytreeids[ptrs[mycells[p]]++] = p + myoffset;
+    }
+}
+
+Index VoronoiDiagram::compute_my_ghost_points(Real epsilon, IndexVector& myghostids, IndexVector& myghostptrs) const
+{
+    int myrank, nprocs;
+    MPI_Comm_rank(comm, &myrank);
+    MPI_Comm_size(comm, &nprocs);
+
+    Index m = num_sites();
+    IndexVectorVector myneighbors(mysize);
+    IndexVector myghostcounts(m, 0);
+
+    Index my_num_ghost_points = 0, num_ghost_points;
+
+    for (Index p = 0; p < mysize; ++p)
+    {
+        find_ghost_neighbors(myneighbors[p], p, epsilon);
+
+        for (Index j : myneighbors[p])
+            myghostcounts[j]++;
+
+        my_num_ghost_points += myneighbors[p].size();
+    }
+
+    myghostptrs.resize(m);
+    std::exclusive_scan(myghostcounts.begin(), myghostcounts.end(), myghostptrs.begin(), static_cast<Index>(0));
+    myghostptrs.push_back(myghostcounts.back() + myghostptrs.back());
+
+    myghostids.resize(myghostptrs.back());
+    IndexVector ptrs = myghostptrs;
+
+    for (Index p = 0; p < mysize; ++p)
+        for (Index j : myneighbors[p])
+            myghostids[ptrs[j]++] = p + myoffset;
+
+    MPI_Allreduce(&my_num_ghost_points, &num_ghost_points, 1, MPI_INT64_T, MPI_SUM, comm);
+
+    return num_ghost_points;
+}

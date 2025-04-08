@@ -112,6 +112,26 @@ int main(int argc, char *argv[])
 
     if (!myrank) fmt::print("[time={:.3f}] built r-net Voronoi diagram [sep={:.3f},num_sites={},farthest={}]\n", maxtime, diagram.get_radius(), diagram.num_sites(), diagram.get_farthest());
 
+    /*
+     * Compute tree points
+     */
+
+    Index num_ghost_points;
+    IndexVector sendtreeids, sendtreeptrs, sendghostids, sendghostptrs;
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    t = -MPI_Wtime();
+
+    diagram.compute_my_tree_points(sendtreeids, sendtreeptrs);
+    num_ghost_points = diagram.compute_my_ghost_points(epsilon, sendghostids, sendghostptrs);
+
+    t += MPI_Wtime();
+
+    MPI_Reduce(&t, &maxtime, 1, MPI_INT64_T, MPI_MAX, 0, MPI_COMM_WORLD);
+    tottime += maxtime;
+
+    if (!myrank) fmt::print("[time={:.3f}] computed ghost points [treepts={},ghostpts={},pts_per_tree={:.1f},ghosts_per_tree={:.1f}]\n", maxtime, totsize, num_ghost_points, totsize/(num_sites+0.0), num_ghost_points/(num_sites+0.0));
+
     MPI_Finalize();
     return 0;
 }
