@@ -41,6 +41,10 @@ class CoverTree
         void set_site(Index i) { site = i; }
         Index get_site() const { return site; }
 
+        int get_packed_bufsize() const;
+        int pack_tree(char *buf, MPI_Comm comm) const;
+        void unpack_tree(const char *buf, int bufsize, MPI_Comm comm);
+
     private:
 
         PointVector points;

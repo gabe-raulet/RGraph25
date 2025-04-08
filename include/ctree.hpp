@@ -274,3 +274,94 @@ void CoverTree::print_tree() const
         fmt::print("u={}\tid={}\tradius={:.3f}\tchildren={}\tleaves={}\n", u, vertices[u].index, vertices[u].radius, cs, ls);
     }
 }
+
+int CoverTree::get_packed_bufsize() const
+{
+    Index p = num_points();
+    Index v = num_vertices();
+    Index c = children.size();
+
+    return sizeof(Index)*4 + sizeof(Point)*p + sizeof(Vertex)*v + sizeof(Index)*p + sizeof(Index)*c + sizeof(Index)*p;
+}
+
+int CoverTree::pack_tree(char *buf, MPI_Comm comm) const
+{
+    MPI_Datatype MPI_VERTEX, MPI_POINT;
+
+    MPI_Type_contiguous(DIM_SIZE, MPI_FLOAT, &MPI_POINT);
+    MPI_Type_commit(&MPI_POINT);
+
+    int blklens[4] = {1,1,1,4};
+    MPI_Aint disps[4] = {offsetof(Vertex, index), offsetof(Vertex, point), offsetof(Vertex, radius), offsetof(Vertex, child_ptr)};
+    MPI_Datatype types[4] = {MPI_INT64_T, MPI_POINT, MPI_FLOAT, MPI_INT64_T};
+    MPI_Type_create_struct(4, blklens, disps, types, &MPI_VERTEX);
+    MPI_Type_commit(&MPI_VERTEX);
+
+    Index header[4];
+
+    Index p = header[0] = num_points();
+    Index v = header[1] = num_vertices();
+    Index c = header[2] = children.size();
+    header[3] = site;
+
+    int bufsize = get_packed_bufsize();
+    int position = 0;
+
+    MPI_Pack(header, 4, MPI_INT64_T, buf, bufsize, &position, comm);
+    MPI_Pack(points.data(), p, MPI_POINT, buf, bufsize, &position, comm);
+    MPI_Pack(vertices.data(), v, MPI_VERTEX, buf, bufsize, &position, comm);
+    MPI_Pack(ids.data(), p, MPI_INT64_T, buf, bufsize, &position, comm);
+    MPI_Pack(children.data(), c, MPI_INT64_T, buf, bufsize, &position, comm);
+    MPI_Pack(leaves.data(), p, MPI_INT64_T, buf, bufsize, &position, comm);
+
+    MPI_Type_free(&MPI_VERTEX);
+    MPI_Type_free(&MPI_POINT);
+
+    return bufsize;
+}
+
+void CoverTree::unpack_tree(const char *buf, int bufsize, MPI_Comm comm)
+{
+    points.clear();
+    vertices.clear();
+    ids.clear();
+    children.clear();
+    leaves.clear();
+
+    MPI_Datatype MPI_VERTEX, MPI_POINT;
+
+    MPI_Type_contiguous(DIM_SIZE, MPI_FLOAT, &MPI_POINT);
+    MPI_Type_commit(&MPI_POINT);
+
+    int blklens[4] = {1,1,1,4};
+    MPI_Aint disps[4] = {offsetof(Vertex, index), offsetof(Vertex, point), offsetof(Vertex, radius), offsetof(Vertex, child_ptr)};
+    MPI_Datatype types[4] = {MPI_INT64_T, MPI_POINT, MPI_FLOAT, MPI_INT64_T};
+    MPI_Type_create_struct(4, blklens, disps, types, &MPI_VERTEX);
+    MPI_Type_commit(&MPI_VERTEX);
+
+    Index header[4];
+    int position = 0;
+
+    MPI_Unpack(buf, bufsize, &position, header, 4, MPI_INT64_T, comm);
+
+    Index p = header[0];
+    Index v = header[1];
+    Index c = header[2];
+    site = header[3];
+
+    points.resize(p);
+    ids.resize(p);
+    vertices.resize(v);
+    children.resize(c);
+    leaves.resize(p);
+
+    MPI_Unpack(buf, bufsize, &position, points.data(), p, MPI_POINT, comm);
+    MPI_Unpack(buf, bufsize, &position, vertices.data(), v, MPI_VERTEX, comm);
+    MPI_Unpack(buf, bufsize, &position, ids.data(), p, MPI_INT64_T, comm);
+    MPI_Unpack(buf, bufsize, &position, children.data(), c, MPI_INT64_T, comm);
+    MPI_Unpack(buf, bufsize, &position, leaves.data(), p, MPI_INT64_T, comm);
+
+    MPI_Type_free(&MPI_VERTEX);
+    MPI_Type_free(&MPI_POINT);
+}
+

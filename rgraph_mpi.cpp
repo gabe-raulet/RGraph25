@@ -29,6 +29,8 @@ using json = nlohmann::json;
 
 Distance distance;
 
+void rebalance_trees(const CoverTree *send_trees, int sendcount, std::vector<CoverTree>& recv_trees, MPI_Comm comm);
+
 int main(int argc, char *argv[])
 {
     int myrank, nprocs;
@@ -41,6 +43,7 @@ int main(int argc, char *argv[])
     Index num_sites;
 
     Index leaf_size = 50;
+    Index rebalance_rate = 10;
     Real cover = 1.8;
     bool random_sites = false;
     const char *graph_fname = NULL;
@@ -56,6 +59,7 @@ int main(int argc, char *argv[])
             fprintf(stderr, "Usage: %s [options] <points> <epsilon> <num_sites>\n", argv[0]);
             fprintf(stderr, "Options: -c FLOAT  covering factor [%.2f]\n", cover);
             fprintf(stderr, "         -l INT    leaf size [%lu]\n", (size_t)leaf_size);
+            fprintf(stderr, "         -n INT    rebalance rate [%d]\n", (int)rebalance_rate);
             fprintf(stderr, "         -o FILE   graph output file\n");
             fprintf(stderr, "         -R        choose sites randomly\n");
             fprintf(stderr, "         -h        help message\n");
@@ -66,12 +70,13 @@ int main(int argc, char *argv[])
     };
 
     int c;
-    while ((c = getopt(argc, argv, "c:l:o:Rh")) >= 0)
+    while ((c = getopt(argc, argv, "c:l:o:n:Rh")) >= 0)
     {
         if      (c == 'c') cover = atof(optarg);
         else if (c == 'l') leaf_size = atoi(optarg);
         else if (c == 'o') graph_fname = optarg;
         else if (c == 'R') random_sites = true;
+        else if (c == 'n') rebalance_rate = atoi(optarg);
         else if (c == 'h') usage(0, !myrank);
     }
 
@@ -205,40 +210,22 @@ int main(int argc, char *argv[])
         const CoverTree *tree = ghost_trees.data();
         Index num_left = ghost_trees.size();
 
-        for (Index i = 0; i < num_left; ++i, ++tree)
+        for (Index i = 0; i < rebalance_rate && num_left > 0; ++i, ++tree, --num_left)
         {
             Index cellsize = diagram.get_cell_size(tree->get_site());
             my_n_edges += tree->graph_query(mygraph, myids, cellsize, epsilon);
         }
 
-        /* for (Index i = 0; i < rebalance_rate && num_left > 0; ++i, ++tree, --num_left) */
-        /* { */
-            /* const Point *pts = tree->pdata(); */
-            /* const Index *ids = tree->idata(); */
+        done = !!(num_left == 0);
 
-            /* Index cellsize = diagram.get_cell_size(tree->get_site()); */
+        MPI_Allreduce(MPI_IN_PLACE, &done, 1, MPI_INT, MPI_LAND, MPI_COMM_WORLD);
 
-            /* for (Index j = 0; j < cellsize; ++j) */
-            /* { */
-                /* mygraph.emplace_back(); */
-                /* myids.push_back(ids[j]); */
-                /* tree->range_query(mygraph.back(), pts[j], epsilon); */
-                /* my_n_edges += mygraph.back().size(); */
-            /* } */
-        /* } */
-
-        /* done = !!(num_left == 0); */
-
-        /* MPI_Allreduce(MPI_IN_PLACE, &done, 1, MPI_INT, MPI_LAND, MPI_COMM_WORLD); */
-
-        /* if (!done) */
-        /* { */
-            /* std::vector<CoverTree> recv_trees; */
-            /* rebalance_trees(tree, num_left, recv_trees, MPI_COMM_WORLD); */
-            /* std::swap(ghost_trees, recv_trees); */
-        /* } */
-
-        done = 1;
+        if (!done)
+        {
+            std::vector<CoverTree> recv_trees;
+            rebalance_trees(tree, num_left, recv_trees, MPI_COMM_WORLD);
+            std::swap(ghost_trees, recv_trees);
+        }
 
     } while (!done);
 
@@ -257,4 +244,100 @@ int main(int argc, char *argv[])
 
     MPI_Finalize();
     return 0;
+}
+
+void rebalance_trees(const CoverTree *send_trees, int sendcount, std::vector<CoverTree>& recv_trees, MPI_Comm comm)
+{
+    int myrank, nprocs;
+    MPI_Comm_rank(comm, &myrank);
+    MPI_Comm_size(comm, &nprocs);
+
+    static std::random_device rd;
+    static std::default_random_engine gen(rd());
+
+    std::uniform_int_distribution<int> dist{0, nprocs-1};
+
+    std::vector<int> assignments(sendcount);
+    std::generate(assignments.begin(), assignments.end(), [&]() { return dist(gen); });
+
+    std::vector<int> sendcounts(nprocs, 0), recvcounts(nprocs), sdispls(nprocs), rdispls(nprocs);
+
+    for (int i = 0; i < sendcount; ++i)
+    {
+        int dest = assignments[i];
+        sendcounts[dest]++;
+    }
+
+    std::exclusive_scan(sendcounts.begin(), sendcounts.end(), sdispls.begin(), static_cast<int>(0));
+
+    IndexVector send_sites(sendcounts.back() + sdispls.back());
+    std::vector<int> send_sizes(sendcounts.back() + sdispls.back());
+    int tot_send_size = 0;
+
+    std::vector<int> ptrs = sdispls;
+
+    for (int i = 0; i < sendcount; ++i)
+    {
+        int dest = assignments[i];
+        int loc = ptrs[dest]++;
+
+        send_sites[loc] = send_trees[i].get_site();
+        send_sizes[loc] = send_trees[i].get_packed_bufsize();
+        tot_send_size += send_sizes[loc];
+    }
+
+    MPI_Alltoall(sendcounts.data(), 1, MPI_INT, recvcounts.data(), 1, MPI_INT, MPI_COMM_WORLD);
+
+    std::exclusive_scan(recvcounts.begin(), recvcounts.end(), rdispls.begin(), static_cast<int>(0));
+
+    IndexVector recv_sites(recvcounts.back() + rdispls.back());
+    std::vector<int> recv_sizes(recvcounts.back() + rdispls.back());
+
+    MPI_Alltoallv(send_sites.data(), sendcounts.data(), sdispls.data(), MPI_INT64_T,
+                  recv_sites.data(), recvcounts.data(), rdispls.data(), MPI_INT64_T, MPI_COMM_WORLD);
+
+    MPI_Alltoallv(send_sizes.data(), sendcounts.data(), sdispls.data(), MPI_INT,
+                  recv_sizes.data(), recvcounts.data(), rdispls.data(), MPI_INT, MPI_COMM_WORLD);
+
+    int recvcount = recv_sites.size();
+    int tot_recv_size = std::accumulate(recv_sizes.begin(), recv_sizes.end(), static_cast<int>(0));
+
+    std::vector<char> sendbuf(tot_send_size);
+    std::vector<MPI_Request> send_reqs(sendcount), recv_reqs(recvcount);
+
+    char *sendptr = sendbuf.data();
+
+    for (int i = 0; i < sendcount; ++i)
+    {
+        int dest = assignments[i];
+        int bufsize = send_trees[i].pack_tree(sendptr, comm);
+        MPI_Isend(sendptr, bufsize, MPI_PACKED, dest, static_cast<int>(send_trees[i].get_site()), comm, &send_reqs[i]);
+        sendptr += bufsize;
+    }
+
+    recv_trees.clear();
+
+    std::vector<char> recvbuf;
+
+    recv_trees.resize(recvcount);
+    recvbuf.resize(tot_recv_size);
+
+    char *recvptr = recvbuf.data();
+
+    for (int i = 0; i < recvcount; ++i)
+    {
+        MPI_Irecv(recvptr, recv_sizes[i], MPI_PACKED, MPI_ANY_SOURCE, static_cast<int>(recv_sites[i]), comm, &recv_reqs[i]);
+        recvptr += recv_sizes[i];
+    }
+
+    recvptr = recvbuf.data();
+
+    for (int i = 0; i < recvcount; ++i)
+    {
+        MPI_Wait(&recv_reqs[i], MPI_STATUS_IGNORE);
+        recv_trees[i].unpack_tree(recvptr, recv_sizes[i], comm);
+        recvptr += recv_sizes[i];
+    }
+
+    MPI_Waitall(sendcount, send_reqs.data(), MPI_STATUSES_IGNORE);
 }
