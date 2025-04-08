@@ -29,7 +29,7 @@ using json = nlohmann::json;
 
 Distance distance;
 
-void rebalance_trees(const CoverTree *send_trees, int sendcount, std::vector<CoverTree>& recv_trees, MPI_Comm comm);
+void rebalance_trees(const GhostTree *send_trees, int sendcount, std::vector<GhostTree>& recv_trees, MPI_Comm comm);
 
 int main(int argc, char *argv[])
 {
@@ -168,7 +168,7 @@ int main(int argc, char *argv[])
     t = -MPI_Wtime();
 
     Index s = mysites.size();
-    std::vector<CoverTree> ghost_trees(s);
+    std::vector<GhostTree> ghost_trees(s);
 
     for (Index i = 0; i < s; ++i)
     {
@@ -207,7 +207,7 @@ int main(int argc, char *argv[])
 
     do
     {
-        const CoverTree *tree = ghost_trees.data();
+        const GhostTree *tree = ghost_trees.data();
         Index num_left = ghost_trees.size();
 
         for (Index i = 0; i < rebalance_rate && num_left > 0; ++i, ++tree, --num_left)
@@ -222,7 +222,7 @@ int main(int argc, char *argv[])
 
         if (!done)
         {
-            std::vector<CoverTree> recv_trees;
+            std::vector<GhostTree> recv_trees;
             rebalance_trees(tree, num_left, recv_trees, MPI_COMM_WORLD);
             std::swap(ghost_trees, recv_trees);
         }
@@ -282,7 +282,7 @@ int main(int argc, char *argv[])
     return 0;
 }
 
-void rebalance_trees(const CoverTree *send_trees, int sendcount, std::vector<CoverTree>& recv_trees, MPI_Comm comm)
+void rebalance_trees(const GhostTree *send_trees, int sendcount, std::vector<GhostTree>& recv_trees, MPI_Comm comm)
 {
     int myrank, nprocs;
     MPI_Comm_rank(comm, &myrank);
