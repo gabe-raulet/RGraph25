@@ -19,6 +19,7 @@ class VoronoiDiagram
         void find_ghost_neighbors(IndexVector& neighbors, Index query, Real epsilon) const;
         void compute_my_tree_points(IndexVector& mytreeids, IndexVector& mytreeptrs) const;
         Index compute_my_ghost_points(Real epsilon, IndexVector& myghostids, IndexVector& myghostptrs) const;
+        void exchange_points(const IndexVector& sendtreeids, const IndexVector& sendtreeptrs, const IndexVector& sendghostids, const IndexVector& sendghostptrs, const IndexVector& assignments, IndexVector& mysites, IndexVector& mytreeids, IndexVector& mytreeptrs, PointVector& mytreepts) const;
 
         Index num_points() const { return mysize; }
         Index num_sites() const { return sites.size(); }

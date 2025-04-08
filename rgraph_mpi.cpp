@@ -132,6 +132,30 @@ int main(int argc, char *argv[])
 
     if (!myrank) fmt::print("[time={:.3f}] computed ghost points [treepts={},ghostpts={},pts_per_tree={:.1f},ghosts_per_tree={:.1f}]\n", maxtime, totsize, num_ghost_points, totsize/(num_sites+0.0), num_ghost_points/(num_sites+0.0));
 
+    /*
+     * Exchange points
+     */
+
+    IndexVector assignments(m), mysites, mytreeids, mytreeptrs, myghostids, myghostptrs;
+    PointVector mytreepts, myghostpts;
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    t = -MPI_Wtime();
+
+    for (Index i = 0; i < m; ++i)
+    {
+        assignments[i] = i % nprocs;
+    }
+
+    diagram.exchange_points(sendtreeids, sendtreeptrs, sendghostids, sendghostptrs, assignments, mysites, mytreeids, mytreeptrs, mytreepts);
+
+    t += MPI_Wtime();
+
+    MPI_Reduce(&t, &maxtime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+    tottime += maxtime;
+
+    if (!myrank) fmt::print("[time={:.3f}] exchanged and repacked points alltoall\n", maxtime);
+
     MPI_Finalize();
     return 0;
 }
