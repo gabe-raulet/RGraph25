@@ -82,13 +82,7 @@ void Hub::compute_child_hubs(const PointVector& points, Real cover, Index leaf_s
     }
 }
 
-void CoverTree::build(const PointVector& pts, Real cover, Index leaf_size)
-{
-    points = pts;
-    build(cover, leaf_size);
-}
-
-void CoverTree::build(Real cover, Index leaf_size)
+void CoverTree::build(const PointVector& points, Real cover, Index leaf_size)
 {
     struct BuildVertex
     {
@@ -173,7 +167,7 @@ void CoverTree::build(Real cover, Index leaf_size)
     vertices.reserve(verts.size());
     children.resize(num_children);
     leaves.resize(n);
-    points.resize(n);
+    leaf_points.resize(n);
 
     Index child_ptr = 0;
     Index leaf_ptr = 0;
@@ -196,18 +190,10 @@ void CoverTree::build(Real cover, Index leaf_size)
 
         for (Index l : myleaves)
         {
-            /* points[leaf_ptr] = pts[l]; */
+            leaf_points[leaf_ptr] = points[l];
             leaves[leaf_ptr++] = l;
         }
     }
-}
-
-template <class PointIter, class IndexIter>
-void CoverTree::build(PointIter pfirst, PointIter plast, IndexIter ifirst, IndexIter ilast, Real cover, Index leaf_size)
-{
-    points.assign(pfirst, plast);
-    ids.assign(ifirst, ilast);
-    build(cover, leaf_size);
 }
 
 Index CoverTree::range_query(IndexVector& neighbors, const Point& query, Real radius) const
@@ -223,7 +209,7 @@ Index CoverTree::range_query(IndexVector& neighbors, const Point& query, Real ra
 
         for (Index i = u_vtx.leaf_ptr; i < u_vtx.leaf_ptr + u_vtx.num_leaves; ++i)
         {
-            if (distance(query, points[leaves[i]]) <= radius)
+            if (distance(query, leaf_points[i]) <= radius)
             {
                 neighbors.push_back(leaves[i]);
             }
@@ -243,126 +229,7 @@ Index CoverTree::range_query(IndexVector& neighbors, const Point& query, Real ra
         }
     }
 
-    if (!ids.empty()) for (Index& id : neighbors) id = ids[id];
-
     return neighbors.size();
-}
-
-Index CoverTree::graph_query(IndexVectorVector& graph, IndexVector& graphids, Index cellsize, Real radius) const
-{
-    Index n_edges = 0;
-
-    for (Index i = 0; i < cellsize; ++i)
-    {
-        graph.emplace_back();
-        graphids.push_back(ids[i]);
-        n_edges += range_query(graph.back(), points[i], radius);
-    }
-
-    return n_edges;
-}
-
-void CoverTree::print_tree() const
-{
-    Index n = num_vertices();
-
-    for (Index u = 0; u < n; ++u)
-    {
-        IndexVector cs(children.begin() + vertices[u].child_ptr, children.begin() + vertices[u].child_ptr + vertices[u].num_children);
-        IndexVector ls(leaves.begin() + vertices[u].leaf_ptr, leaves.begin() + vertices[u].leaf_ptr + vertices[u].num_leaves);
-
-        fmt::print("u={}\tid={}\tradius={:.3f}\tchildren={}\tleaves={}\n", u, vertices[u].index, vertices[u].radius, cs, ls);
-    }
-}
-
-int CoverTree::get_packed_bufsize() const
-{
-    Index p = num_points();
-    Index v = num_vertices();
-    Index c = children.size();
-
-    return sizeof(Index)*4 + sizeof(Point)*p + sizeof(Vertex)*v + sizeof(Index)*p + sizeof(Index)*c + sizeof(Index)*p;
-}
-
-int CoverTree::pack_tree(char *buf, MPI_Comm comm) const
-{
-    MPI_Datatype MPI_VERTEX, MPI_POINT;
-
-    MPI_Type_contiguous(DIM_SIZE, MPI_FLOAT, &MPI_POINT);
-    MPI_Type_commit(&MPI_POINT);
-
-    int blklens[4] = {1,1,1,4};
-    MPI_Aint disps[4] = {offsetof(Vertex, index), offsetof(Vertex, point), offsetof(Vertex, radius), offsetof(Vertex, child_ptr)};
-    MPI_Datatype types[4] = {MPI_INT64_T, MPI_POINT, MPI_FLOAT, MPI_INT64_T};
-    MPI_Type_create_struct(4, blklens, disps, types, &MPI_VERTEX);
-    MPI_Type_commit(&MPI_VERTEX);
-
-    Index header[4];
-
-    Index p = header[0] = num_points();
-    Index v = header[1] = num_vertices();
-    Index c = header[2] = children.size();
-    header[3] = site;
-
-    int bufsize = get_packed_bufsize();
-    int position = 0;
-
-    MPI_Pack(header, 4, MPI_INT64_T, buf, bufsize, &position, comm);
-    MPI_Pack(points.data(), p, MPI_POINT, buf, bufsize, &position, comm);
-    MPI_Pack(vertices.data(), v, MPI_VERTEX, buf, bufsize, &position, comm);
-    MPI_Pack(ids.data(), p, MPI_INT64_T, buf, bufsize, &position, comm);
-    MPI_Pack(children.data(), c, MPI_INT64_T, buf, bufsize, &position, comm);
-    MPI_Pack(leaves.data(), p, MPI_INT64_T, buf, bufsize, &position, comm);
-
-    MPI_Type_free(&MPI_VERTEX);
-    MPI_Type_free(&MPI_POINT);
-
-    return bufsize;
-}
-
-void CoverTree::unpack_tree(const char *buf, int bufsize, MPI_Comm comm)
-{
-    points.clear();
-    vertices.clear();
-    ids.clear();
-    children.clear();
-    leaves.clear();
-
-    MPI_Datatype MPI_VERTEX, MPI_POINT;
-
-    MPI_Type_contiguous(DIM_SIZE, MPI_FLOAT, &MPI_POINT);
-    MPI_Type_commit(&MPI_POINT);
-
-    int blklens[4] = {1,1,1,4};
-    MPI_Aint disps[4] = {offsetof(Vertex, index), offsetof(Vertex, point), offsetof(Vertex, radius), offsetof(Vertex, child_ptr)};
-    MPI_Datatype types[4] = {MPI_INT64_T, MPI_POINT, MPI_FLOAT, MPI_INT64_T};
-    MPI_Type_create_struct(4, blklens, disps, types, &MPI_VERTEX);
-    MPI_Type_commit(&MPI_VERTEX);
-
-    Index header[4];
-    int position = 0;
-
-    MPI_Unpack(buf, bufsize, &position, header, 4, MPI_INT64_T, comm);
-
-    Index p = header[0];
-    Index v = header[1];
-    Index c = header[2];
-    site = header[3];
-
-    points.resize(p);
-    ids.resize(p);
-    vertices.resize(v);
-    children.resize(c);
-    leaves.resize(p);
-
-    MPI_Unpack(buf, bufsize, &position, points.data(), p, MPI_POINT, comm);
-    MPI_Unpack(buf, bufsize, &position, vertices.data(), v, MPI_VERTEX, comm);
-    MPI_Unpack(buf, bufsize, &position, ids.data(), p, MPI_INT64_T, comm);
-    MPI_Unpack(buf, bufsize, &position, children.data(), c, MPI_INT64_T, comm);
-    MPI_Unpack(buf, bufsize, &position, leaves.data(), p, MPI_INT64_T, comm);
-
-    MPI_Type_free(&MPI_VERTEX);
-    MPI_Type_free(&MPI_POINT);
 }
 
 void GhostTree::build(const PointVector& pts, Real cover, Index leaf_size)
