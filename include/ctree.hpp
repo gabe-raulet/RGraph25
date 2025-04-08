@@ -342,6 +342,7 @@ void GhostTree::unpack_tree(const char *buf, int bufsize, MPI_Comm comm)
     tree.vertices.resize(v);
     tree.children.resize(c);
     tree.leaves.resize(l);
+    tree.n = n;
 
     MPI_Unpack(buf, bufsize, &position, ids.data(), n, MPI_INT64_T, comm);
     MPI_Unpack(buf, bufsize, &position, points.data(), p, MPI_POINT, comm);
