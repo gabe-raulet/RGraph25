@@ -184,6 +184,77 @@ int main(int argc, char *argv[])
 
     if (!myrank) fmt::print("[time={:.3f}] computed ghost trees\n", maxtime);
 
+    /*
+     * Build epsilon graph
+     */
+
+    MPI_Barrier(MPI_COMM_WORLD);
+    t = -MPI_Wtime();
+
+    IndexVectorVector mygraph;
+    IndexVector myids;
+
+    mygraph.reserve(totsize/nprocs);
+    myids.reserve(totsize/nprocs);
+
+    Index my_n_edges = 0, n_edges;
+    int done = 0;
+
+    do
+    {
+        const CoverTree *tree = ghost_trees.data();
+        Index num_left = ghost_trees.size();
+
+        for (Index i = 0; i < num_left; ++i, ++tree)
+        {
+            Index cellsize = diagram.get_cell_size(tree->get_site());
+            my_n_edges += tree->graph_query(mygraph, myids, cellsize, epsilon);
+        }
+
+        /* for (Index i = 0; i < rebalance_rate && num_left > 0; ++i, ++tree, --num_left) */
+        /* { */
+            /* const Point *pts = tree->pdata(); */
+            /* const Index *ids = tree->idata(); */
+
+            /* Index cellsize = diagram.get_cell_size(tree->get_site()); */
+
+            /* for (Index j = 0; j < cellsize; ++j) */
+            /* { */
+                /* mygraph.emplace_back(); */
+                /* myids.push_back(ids[j]); */
+                /* tree->range_query(mygraph.back(), pts[j], epsilon); */
+                /* my_n_edges += mygraph.back().size(); */
+            /* } */
+        /* } */
+
+        /* done = !!(num_left == 0); */
+
+        /* MPI_Allreduce(MPI_IN_PLACE, &done, 1, MPI_INT, MPI_LAND, MPI_COMM_WORLD); */
+
+        /* if (!done) */
+        /* { */
+            /* std::vector<CoverTree> recv_trees; */
+            /* rebalance_trees(tree, num_left, recv_trees, MPI_COMM_WORLD); */
+            /* std::swap(ghost_trees, recv_trees); */
+        /* } */
+
+        done = 1;
+
+    } while (!done);
+
+    t += MPI_Wtime();
+
+    MPI_Reduce(&t, &maxtime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+    tottime += maxtime;
+
+    MPI_Reduce(&my_n_edges, &n_edges, 1, MPI_INT64_T, MPI_SUM, 0, MPI_COMM_WORLD);
+
+    Real density, sparsity;
+    density = (n_edges+0.0)/totsize;
+    sparsity = density / totsize;
+
+    if (!myrank) fmt::print("[time={:.3f}] built epsilon graph [density={:.3f},sparsity={:.3f},edges={}]\n", maxtime, density, sparsity, n_edges);
+
     MPI_Finalize();
     return 0;
 }

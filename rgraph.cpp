@@ -74,13 +74,13 @@ int main(int argc, char *argv[])
     #pragma omp parallel
     nthreads = omp_get_num_threads();
 
-    CoverTree tree;
     IndexVectorVector graph;
 
     read_fvecs(points, points_fname);
 
     t = -omp_get_wtime();
-    tree.build(points, covering_factor, leaf_size);
+    CoverTree tree(points);
+    tree.build(covering_factor, leaf_size);
     t += omp_get_wtime();
     tottime += t;
 
