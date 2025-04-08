@@ -95,7 +95,7 @@ void CoverTree::build(const PointVector& points, Real cover, Index leaf_size)
         BuildVertex(Index index, Real radius) : index(index), radius(radius) {}
     };
 
-    Index n = points.size();
+    n = points.size();
     std::deque<Hub> hubs;
 
     hubs.emplace_back();
@@ -128,6 +128,7 @@ void CoverTree::build(const PointVector& points, Real cover, Index leaf_size)
     root_hub.vertex = 0;
 
     Index num_children = 0;
+    Index num_leaves = 0;
 
     while (!hubs.empty())
     {
@@ -161,13 +162,15 @@ void CoverTree::build(const PointVector& points, Real cover, Index leaf_size)
             {
                 verts[vertex].leaves.push_back(leaf);
             }
+
+            num_leaves += leaf_hub.ids.size();
         }
     }
 
     vertices.reserve(verts.size());
     children.resize(num_children);
-    leaves.resize(n);
-    leaf_points.resize(n);
+    leaves.resize(num_leaves);
+    leaf_points.resize(num_leaves);
 
     Index child_ptr = 0;
     Index leaf_ptr = 0;
@@ -260,12 +263,13 @@ Index GhostTree::graph_query(IndexVectorVector& graph, IndexVector& graphids, Re
 
 int GhostTree::get_packed_bufsize() const
 {
-    Index p = tree.leaf_points.size();
+    Index p = points.size();
+    Index n = tree.n;
+    Index l = tree.leaf_points.size();
     Index v = tree.vertices.size();
     Index c = tree.children.size();
-    Index n = points.size();
 
-    return sizeof(Index)*5 + sizeof(Index)*p + sizeof(Point)*n + sizeof(Point)*p + sizeof(Vertex)*v + sizeof(Index)*c + sizeof(Index)*p;
+    return sizeof(Index)*6 + sizeof(Index)*n + sizeof(Point)*p + sizeof(Point)*l + sizeof(Vertex)*v + sizeof(Index)*c + sizeof(Index)*l;
 }
 
 int GhostTree::pack_tree(char *buf, MPI_Comm comm) const
@@ -281,24 +285,25 @@ int GhostTree::pack_tree(char *buf, MPI_Comm comm) const
     MPI_Type_create_struct(4, blklens, disps, types, &MPI_VERTEX);
     MPI_Type_commit(&MPI_VERTEX);
 
-    Index header[5];
+    Index header[6];
 
-    Index p = header[0] = tree.leaf_points.size();
-    Index v = header[1] = tree.vertices.size();
-    Index c = header[2] = tree.children.size();
-    Index n = header[3] = points.size();
-    header[4] = site;
+    Index p = header[0] = points.size();
+    Index n = header[1] = tree.n;
+    Index l = header[2] = tree.leaf_points.size();
+    Index v = header[3] = tree.vertices.size();
+    Index c = header[4] = tree.children.size();
+    header[5] = site;
 
     int bufsize = get_packed_bufsize();
     int position = 0;
 
-    MPI_Pack(header, 5, MPI_INT64_T, buf, bufsize, &position, comm);
-    MPI_Pack(ids.data(), p, MPI_INT64_T, buf, bufsize, &position, comm);
-    MPI_Pack(points.data(), n, MPI_POINT, buf, bufsize, &position, comm);
-    MPI_Pack(tree.leaf_points.data(), p, MPI_POINT, buf, bufsize, &position, comm);
+    MPI_Pack(header, 6, MPI_INT64_T, buf, bufsize, &position, comm);
+    MPI_Pack(ids.data(), n, MPI_INT64_T, buf, bufsize, &position, comm);
+    MPI_Pack(points.data(), p, MPI_POINT, buf, bufsize, &position, comm);
+    MPI_Pack(tree.leaf_points.data(), l, MPI_POINT, buf, bufsize, &position, comm);
     MPI_Pack(tree.vertices.data(), v, MPI_VERTEX, buf, bufsize, &position, comm);
     MPI_Pack(tree.children.data(), c, MPI_INT64_T, buf, bufsize, &position, comm);
-    MPI_Pack(tree.leaves.data(), p, MPI_INT64_T, buf, bufsize, &position, comm);
+    MPI_Pack(tree.leaves.data(), l, MPI_INT64_T, buf, bufsize, &position, comm);
 
     MPI_Type_free(&MPI_VERTEX);
     MPI_Type_free(&MPI_POINT);
@@ -319,30 +324,31 @@ void GhostTree::unpack_tree(const char *buf, int bufsize, MPI_Comm comm)
     MPI_Type_create_struct(4, blklens, disps, types, &MPI_VERTEX);
     MPI_Type_commit(&MPI_VERTEX);
 
-    Index header[5];
+    Index header[6];
     int position = 0;
 
-    MPI_Unpack(buf, bufsize, &position, header, 5, MPI_INT64_T, comm);
+    MPI_Unpack(buf, bufsize, &position, header, 6, MPI_INT64_T, comm);
 
     Index p = header[0];
-    Index v = header[1];
-    Index c = header[2];
-    Index n = header[3];
-    site = header[4];
+    Index n = header[1];
+    Index l = header[2];
+    Index v = header[3];
+    Index c = header[4];
+    site = header[5];
 
-    ids.resize(p);
-    points.resize(n);
-    tree.leaf_points.resize(p);
+    ids.resize(n);
+    points.resize(p);
+    tree.leaf_points.resize(l);
     tree.vertices.resize(v);
     tree.children.resize(c);
-    tree.leaves.resize(p);
+    tree.leaves.resize(l);
 
-    MPI_Unpack(buf, bufsize, &position, ids.data(), p, MPI_INT64_T, comm);
-    MPI_Unpack(buf, bufsize, &position, points.data(), n, MPI_POINT, comm);
-    MPI_Unpack(buf, bufsize, &position, tree.leaf_points.data(), p, MPI_POINT, comm);
+    MPI_Unpack(buf, bufsize, &position, ids.data(), n, MPI_INT64_T, comm);
+    MPI_Unpack(buf, bufsize, &position, points.data(), p, MPI_POINT, comm);
+    MPI_Unpack(buf, bufsize, &position, tree.leaf_points.data(), l, MPI_POINT, comm);
     MPI_Unpack(buf, bufsize, &position, tree.vertices.data(), v, MPI_VERTEX, comm);
     MPI_Unpack(buf, bufsize, &position, tree.children.data(), c, MPI_INT64_T, comm);
-    MPI_Unpack(buf, bufsize, &position, tree.leaves.data(), p, MPI_INT64_T, comm);
+    MPI_Unpack(buf, bufsize, &position, tree.leaves.data(), l, MPI_INT64_T, comm);
 
     MPI_Type_free(&MPI_VERTEX);
     MPI_Type_free(&MPI_POINT);

@@ -28,7 +28,7 @@ class CoverTree
         CoverTree() {}
 
         Index num_vertices() const { return vertices.size(); }
-        Index num_points() const { return leaf_points.size(); }
+        Index num_points() const { return n; }
 
         void build(const PointVector& points, Real cover, Index leaf_size);
 
@@ -39,6 +39,7 @@ class CoverTree
         PointVector leaf_points;
         VertexVector vertices;
         IndexVector children, leaves;
+        Index n;
 };
 
 class GhostTree
