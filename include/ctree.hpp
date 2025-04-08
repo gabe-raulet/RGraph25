@@ -82,6 +82,15 @@ void Hub::compute_child_hubs(const PointVector& points, Real cover, Index leaf_s
     }
 }
 
+
+template <class PointIter, class IndexIter>
+void CoverTree::build(PointIter pfirst, PointIter plast, IndexIter ifirst, IndexIter ilast, Real cover, Index leaf_size)
+{
+    PointVector pts(pfirst, plast);
+    ids.assign(ifirst, ilast);
+    build(pts, cover, leaf_size);
+}
+
 void CoverTree::build(const PointVector& pts, Real cover, Index leaf_size)
 {
     struct BuildVertex
@@ -228,6 +237,8 @@ void CoverTree::range_query(IndexVector& neighbors, const Point& query, Real rad
             }
         }
     }
+
+    if (!ids.empty()) for (Index& id : neighbors) id = ids[id];
 }
 
 void CoverTree::print_tree() const

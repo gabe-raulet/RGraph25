@@ -156,6 +156,34 @@ int main(int argc, char *argv[])
 
     if (!myrank) fmt::print("[time={:.3f}] exchanged and repacked points alltoall\n", maxtime);
 
+    /*
+     * Build ghost trees
+     */
+    MPI_Barrier(MPI_COMM_WORLD);
+    t = -MPI_Wtime();
+
+    Index s = mysites.size();
+    std::vector<CoverTree> ghost_trees(s);
+
+    for (Index i = 0; i < s; ++i)
+    {
+        auto pfirst = mytreepts.begin() + mytreeptrs[i];
+        auto plast = mytreepts.begin() + mytreeptrs[i+1];
+
+        auto ifirst = mytreeids.begin() + mytreeptrs[i];
+        auto ilast = mytreeids.begin() + mytreeptrs[i+1];
+
+        ghost_trees[i].build(pfirst, plast, ifirst, ilast, cover, leaf_size);
+        ghost_trees[i].set_site(mysites[i]);
+    }
+
+    t += MPI_Wtime();
+
+    MPI_Reduce(&t, &maxtime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+    tottime += maxtime;
+
+    if (!myrank) fmt::print("[time={:.3f}] computed ghost trees\n", maxtime);
+
     MPI_Finalize();
     return 0;
 }

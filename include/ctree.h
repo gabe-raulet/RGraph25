@@ -29,13 +29,20 @@ class CoverTree
         void build(const PointVector& pts, Real cover, Index leaf_size);
         void range_query(IndexVector& neighbors, const Point& query, Real radius) const;
 
+        template <class PointIter, class IndexIter>
+        void build(PointIter pfirst, PointIter plast, IndexIter ifirst, IndexIter ilast, Real cover, Index leaf_size);
+
         void print_tree() const;
+
+        void set_site(Index i) { site = i; }
+        Index get_site() const { return site; }
 
     private:
 
         PointVector points;
         VertexVector vertices;
-        IndexVector children, leaves;
+        IndexVector children, leaves, ids;
+        Index site;
 };
 
 #include "ctree.hpp"
