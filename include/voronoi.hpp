@@ -71,6 +71,7 @@ void VoronoiDiagram::build_random_diagram(Index m)
     for (Index i = 0; i < m; ++i)
         sites[i] = i;
 
+    #pragma omp parallel for
     for (Index p = 0; p < mysize; ++p)
     {
         for (Index i = 0; i < m; ++i)
@@ -96,8 +97,12 @@ void VoronoiDiagram::build_random_diagram(Index m)
     farthest = ball.id;
     radius = ball.radius;
 
+    #pragma omp parallel for
     for (Index p = 0; p < mysize; ++p)
+    {
+        #pragma omp atomic update
         my_cell_sizes[mycells[p]]++;
+    }
 
     MPI_Allreduce(my_cell_sizes.data(), cell_sizes.data(), static_cast<int>(m), MPI_INT64_T, MPI_SUM, comm);
 
@@ -131,6 +136,11 @@ void VoronoiDiagram::build_greedy_diagram(Index m)
 
     MPI_Bcast(&ball.point, 1, MPI_POINT, 0, comm);
 
+    #pragma omp declare reduction(argmax_reduce : Ball : \
+            omp_out = (omp_out.radius > omp_in.radius)? omp_out : omp_in) \
+            initializer(omp_priv = Ball())
+
+
     /*
      * Pick m sites using greedy permutation selection
      */
@@ -150,6 +160,7 @@ void VoronoiDiagram::build_greedy_diagram(Index m)
          * from its Voronoi site (it may have changed)
          */
 
+        #pragma omp parallel for reduction(argmax_reduce:ball)
         for (Index p = 0; p < mysize; ++p)
         {
             Real d = distance(mypoints[p], site_points[i]);
@@ -178,9 +189,12 @@ void VoronoiDiagram::build_greedy_diagram(Index m)
     farthest = ball.id;
     radius = ball.radius;
 
+    #pragma omp parallel for
     for (Index p = 0; p < mysize; ++p)
     {
         Index cell = mycells[p];
+
+        #pragma omp atomic update
         my_cell_sizes[cell]++;
     }
 
@@ -233,12 +247,15 @@ Index VoronoiDiagram::compute_my_ghost_points(Real epsilon, IndexVector& myghost
 
     Index my_num_ghost_points = 0, num_ghost_points;
 
+    Index *treecounts = myghostcounts.data();
+
+    #pragma omp parallel for schedule(dynamic) reduction(+:treecounts[:m]) reduction(+:my_num_ghost_points)
     for (Index p = 0; p < mysize; ++p)
     {
         find_ghost_neighbors(myneighbors[p], p, epsilon);
 
         for (Index j : myneighbors[p])
-            myghostcounts[j]++;
+            treecounts[j]++;
 
         my_num_ghost_points += myneighbors[p].size();
     }
@@ -288,8 +305,6 @@ void VoronoiDiagram::exchange_points(const IndexVector& sendtreeids, const Index
     MPI_Datatype MPI_POINT, MPI_POINT_ENVELOPE;
 
     create_mpi_point(&MPI_POINT);
-    /* MPI_Type_contiguous(DIM_SIZE, MPI_FLOAT, &MPI_POINT); */
-    /* MPI_Type_commit(&MPI_POINT); */
 
     int blklens[3] = {1,2,1};
     MPI_Aint disps[3] = {offsetof(PointEnvelope, point), offsetof(PointEnvelope, id), offsetof(PointEnvelope, ghost)};
@@ -348,11 +363,22 @@ void VoronoiDiagram::exchange_points(const IndexVector& sendtreeids, const Index
     Index s = mysites.size();
     IndexVector myrecvcounts(s);
 
-    for (const auto& [point, id, cell, ghost] : recvbuf)
+    Index numrecv = recvbuf.size();
+
+    #pragma omp parallel for
+    for (Index i = 0; i < numrecv; ++i)
     {
-        Index slot = myslots.find(cell)->second;
+        Index slot = myslots.find(recvbuf[i].cell)->second;
+
+        #pragma omp atomic update
         myrecvcounts[slot]++;
     }
+
+    /* for (const auto& [point, id, cell, ghost] : recvbuf) */
+    /* { */
+        /* Index slot = myslots.find(cell)->second; */
+        /* myrecvcounts[slot]++; */
+    /* } */
 
     mytreeptrs.resize(s);
     std::exclusive_scan(myrecvcounts.begin(), myrecvcounts.end(), mytreeptrs.begin(), static_cast<Index>(0));
