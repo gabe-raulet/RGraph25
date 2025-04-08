@@ -22,7 +22,7 @@ class CoverTree
         static inline constexpr Distance distance = Distance();
 
         CoverTree() {}
-        CoverTree(const PointVector& points) : points(points) {}
+        /* CoverTree(const PointVector& points) : points(points) {} */
 
         Index num_vertices() const { return vertices.size(); }
         Index num_points() const { return points.size(); }

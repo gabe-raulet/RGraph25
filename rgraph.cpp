@@ -75,12 +75,12 @@ int main(int argc, char *argv[])
     nthreads = omp_get_num_threads();
 
     IndexVectorVector graph;
+    CoverTree tree;
 
     read_fvecs(points, points_fname);
 
     t = -omp_get_wtime();
-    CoverTree tree(points);
-    tree.build(covering_factor, leaf_size);
+    tree.build(points, covering_factor, leaf_size);
     t += omp_get_wtime();
     tottime += t;
 
