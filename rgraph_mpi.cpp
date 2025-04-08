@@ -172,14 +172,14 @@ int main(int argc, char *argv[])
 
     for (Index i = 0; i < s; ++i)
     {
-        auto pfirst = mytreepts.begin() + mytreeptrs[i];
-        auto plast = mytreepts.begin() + mytreeptrs[i+1];
+        auto p1 = mytreepts.begin() + mytreeptrs[i];
+        auto p2 = mytreepts.begin() + mytreeptrs[i+1];
 
-        auto ifirst = mytreeids.begin() + mytreeptrs[i];
-        auto ilast = mytreeids.begin() + mytreeptrs[i+1];
+        auto i1 = mytreeids.begin() + mytreeptrs[i];
+        auto i2 = mytreeids.begin() + mytreeptrs[i+1];
 
-        ghost_trees[i].build(pfirst, plast, ifirst, ilast, cover, leaf_size);
-        ghost_trees[i].set_site(mysites[i]);
+        Index cellsize = diagram.get_cell_size(mysites[i]);
+        ghost_trees[i].build(p1, p2, i1, i2, cellsize, mysites[i], cover, leaf_size);
     }
 
     t += MPI_Wtime();
@@ -212,8 +212,7 @@ int main(int argc, char *argv[])
 
         for (Index i = 0; i < rebalance_rate && num_left > 0; ++i, ++tree, --num_left)
         {
-            Index cellsize = diagram.get_cell_size(tree->get_site());
-            my_n_edges += tree->graph_query(mygraph, myids, cellsize, epsilon);
+            my_n_edges += tree->graph_query(mygraph, myids, epsilon);
         }
 
         done = !!(num_left == 0);

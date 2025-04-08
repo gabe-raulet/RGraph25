@@ -48,34 +48,26 @@ class GhostTree
         static inline constexpr Distance distance = Distance();
 
         GhostTree() {}
-        GhostTree(const PointVector& points) : points(points) {}
 
-        Index num_vertices() const { return vertices.size(); }
-        Index num_points() const { return points.size(); }
-
-        void build(Real cover, Index leaf_size);
-        void build(const PointVector& pts, Real cover, Index leaf_size);
+        Index num_vertices() const { return tree.num_vertices(); }
+        Index num_points() const { return tree.num_points(); }
 
         template <class PointIter, class IndexIter>
-        void build(PointIter pfirst, PointIter plast, IndexIter ifirst, IndexIter ilast, Real cover, Index leaf_size);
+        void build(PointIter p1, PointIter p2, IndexIter i1, IndexIter i2, Index cellsize, Index site, Real cover, Index leaf_size);
 
-        Index range_query(IndexVector& neighbors, const Point& query, Real radius) const;
-        Index graph_query(IndexVectorVector& graph, IndexVector& graphids, Index cellsize, Real radius) const;
-
-        void print_tree() const;
-
-        void set_site(Index i) { site = i; }
-        Index get_site() const { return site; }
+        Index graph_query(IndexVectorVector& graph, IndexVector& graphids, Real radius) const;
 
         int get_packed_bufsize() const;
         int pack_tree(char *buf, MPI_Comm comm) const;
         void unpack_tree(const char *buf, int bufsize, MPI_Comm comm);
 
+        Index get_site() const { return site; }
+
     private:
 
+        CoverTree tree;
         PointVector points;
-        VertexVector vertices;
-        IndexVector children, leaves, ids;
+        IndexVector ids;
         Index site;
 };
 
