@@ -240,6 +240,7 @@ int main(int argc, char *argv[])
     sparsity = density / totsize;
 
     if (!myrank) fmt::print("[time={:.3f}] built epsilon graph [density={:.3f},sparsity={:.3f},edges={}]\n", maxtime, density, sparsity, n_edges);
+    if (!myrank) fmt::print("[time={:.3f}] start-to-finish [qps={:.3f}]\n", tottime, totsize/tottime);
 
     if (graph_fname)
     {

@@ -110,6 +110,7 @@ int main(int argc, char *argv[])
     sparsity = density/n;
 
     fmt::print("[time={:.3f}] built epsilon graph [density={:.3f},edges={},qps={:.3f}]\n", t, density, n_edges, n/t);
+    fmt::print("[time={:.3f}] start-to-finish [qps={:.3f}]\n", tottime, n/tottime);
 
     if (verify_graph)
     {

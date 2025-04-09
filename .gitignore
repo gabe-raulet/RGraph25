@@ -6,4 +6,5 @@ sift
 points
 rgraph
 rgraph_mpi
+ptgen
 *.tar.gz
