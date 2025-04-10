@@ -258,9 +258,10 @@ Index VoronoiDiagram::compute_my_ghost_points(Real epsilon, IndexVector& myghost
         for (Index j : myneighbors[p])
             myghostids[ptrs[j]++] = p + myoffset;
 
-    MPI_Allreduce(&my_num_ghost_points, &num_ghost_points, 1, MPI_INT64_T, MPI_SUM, comm);
+    return my_num_ghost_points;
+    /* MPI_Allreduce(&my_num_ghost_points, &num_ghost_points, 1, MPI_INT64_T, MPI_SUM, comm); */
 
-    return num_ghost_points;
+    /* return num_ghost_points; */
 }
 
 void VoronoiDiagram::exchange_points(const IndexVector& sendtreeids, const IndexVector& sendtreeptrs, const IndexVector& sendghostids, const IndexVector& sendghostptrs, const IndexVector& assignments, IndexVector& mysites, IndexVector& mytreeids, IndexVector& mytreeptrs, PointVector& mytreepts) const
