@@ -1,6 +1,7 @@
 DEBUG?=0
 LOG?=1
 D?=32
+STATS?=1
 FLAGS=-std=c++20 -fopenmp
 INCS=-I./ -I./include
 
@@ -20,6 +21,10 @@ endif
 
 ifeq ($(LOG),1)
 FLAGS+=-DLOG
+endif
+
+ifeq ($(STATS),1)
+FLAGS+=-DSTATS
 endif
 
 all: rgraph rgraph_mpi ptgen
