@@ -258,9 +258,8 @@ int main(int argc, char *argv[])
 
     } while (!done);
 
-    t += MPI_Wtime();
-
     #ifdef STATS
+    t += MPI_Wtime();
     MPI_Reduce(&t, &maxtime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
     MPI_Reduce(&t2, &max_compute_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
     MPI_Reduce(&t2, &sum_compute_time, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
@@ -280,7 +279,7 @@ int main(int argc, char *argv[])
 
     #ifndef STATS
     t += MPI_Wtime();
-    MPI_Reduce(&t, &tottime, 1, MPI_INT64_T, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&t, &tottime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
     MPI_Reduce(&my_n_edges, &n_edges, 1, MPI_INT64_T, MPI_SUM, 0, MPI_COMM_WORLD);
     Real density = (n_edges+0.0)/totsize;
     if (!myrank) fmt::print("[time={:.3f}] start-to-finish [qps={:.1f}K,density={:.3f},edges={}]\n", tottime, totsize/(tottime*1000.), density, n_edges);
