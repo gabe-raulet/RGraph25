@@ -119,7 +119,8 @@ int main(int argc, char *argv[])
     MPI_Reduce(&mydistcomps, &distcomps, 1, MPI_INT64_T, MPI_SUM, 0, MPI_COMM_WORLD);
     tot_distcomps += distcomps;
 
-    if (!myrank) fmt::print("[time={:.3f}] built r-net Voronoi diagram [sep={:.3f},num_sites={},farthest={},distcomps={:.1f}M]\n", maxtime, diagram.get_radius(), diagram.num_sites(), diagram.get_farthest(), distcomps/1000000.);
+    double voronoi_time = maxtime;
+    //if (!myrank) fmt::print("[time={:.3f}] built r-net Voronoi diagram [sep={:.3f},num_sites={},farthest={},distcomps={:.1f}M]\n", maxtime, diagram.get_radius(), diagram.num_sites(), diagram.get_farthest(), distcomps/1000000.);
     #endif
 
     /*
@@ -147,7 +148,11 @@ int main(int argc, char *argv[])
     MPI_Reduce(&mydistcomps, &distcomps, 1, MPI_INT64_T, MPI_SUM, 0, MPI_COMM_WORLD);
     tot_distcomps += distcomps;
 
-    if (!myrank) fmt::print("[time={:.3f}] computed ghost points [treepts={},ghostpts={},pts_per_tree={:.1f},ghosts_per_tree={:.1f},distcomps={:.1f}M]\n", maxtime, totsize, num_ghost_points, totsize/(num_sites+0.0), num_ghost_points/(num_sites+0.0), distcomps/1000000.);
+    double tree_points_time = maxtime;
+    Index treepts_o = totsize;
+    Index ghostpts_o = num_ghost_points;
+
+    //if (!myrank) fmt::print("[time={:.3f}] computed ghost points [treepts={},ghostpts={},pts_per_tree={:.1f},ghosts_per_tree={:.1f},distcomps={:.1f}M]\n", maxtime, totsize, num_ghost_points, totsize/(num_sites+0.0), num_ghost_points/(num_sites+0.0), distcomps/1000000.);
     #endif
 
     /*
@@ -175,7 +180,8 @@ int main(int argc, char *argv[])
     MPI_Reduce(&t, &maxtime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
     tottime += maxtime;
 
-    if (!myrank) fmt::print("[time={:.3f}] exchanged and repacked points alltoall\n", maxtime);
+    //if (!myrank) fmt::print("[time={:.3f}] exchanged and repacked points alltoall\n", maxtime);
+    double exchange_points_time = maxtime;
 
     /*
      * Build ghost trees
@@ -209,7 +215,8 @@ int main(int argc, char *argv[])
     MPI_Reduce(&mydistcomps, &distcomps, 1, MPI_INT64_T, MPI_SUM, 0, MPI_COMM_WORLD);
     tot_distcomps += distcomps;
 
-    if (!myrank) fmt::print("[time={:.3f}] computed ghost trees [distcomps={:.1f}M]\n", maxtime, distcomps/1000000.);
+    //if (!myrank) fmt::print("[time={:.3f}] computed ghost trees [distcomps={:.1f}M]\n", maxtime, distcomps/1000000.);
+    double compute_tree_time = maxtime;
 
     /*
      * Build epsilon graph
@@ -273,8 +280,34 @@ int main(int argc, char *argv[])
 
     Real density = (n_edges+0.0)/totsize;
 
-    if (!myrank) fmt::print("[time={:.3f}] built epsilon graph [density={:.3f},edges={},imbalance={:.3f},distcomps={:.1f}M]\n", maxtime, density, n_edges, nprocs*max_compute_time/sum_compute_time, distcomps/1000000.);
-    if (!myrank) fmt::print("[time={:.3f}] start-to-finish [qps={:.1f}K,distcomps={:.1f}M]\n", tottime, totsize/(tottime*1000.), tot_distcomps/1000000.);
+
+    //if (!myrank) fmt::print("[time={:.3f}] built epsilon graph [density={:.3f},edges={},imbalance={:.3f},distcomps={:.1f}M]\n", maxtime, density, n_edges, nprocs*max_compute_time/sum_compute_time, distcomps/1000000.);
+    //if (!myrank) fmt::print("[time={:.3f}] start-to-finish [qps={:.1f}K,distcomps={:.1f}M]\n", tottime, totsize/(tottime*1000.), tot_distcomps/1000000.);
+
+    double compute_graph_time = maxtime;
+
+    if (!myrank)
+    {
+        /*
+         * filename
+         * nprocs
+         * cover
+         * leaf
+         * num_sites
+         * random_sites
+         * num_points
+         * num_edges
+         * density
+         * voronoi_time
+         * tree_points_time
+         * exchange_points_time
+         * compute_tree_time
+         * compute_graph_time
+         * distcomps
+         */
+        fmt::print("{}\t{}\t{:.2f}\t{}\t{}\t{}\t{}\t{}\t{:.2f}\t{:.3f}\t{:.3f}\t{:.3f}\t{:.3f}\t{:.3f}\t{}\n", points_fname, nprocs, cover, leaf_size, num_sites, random_sites, totsize, n_edges, density, voronoi_time, tree_points_time, exchange_points_time, compute_tree_time, compute_graph_time, tot_distcomps);
+    }
+    
     #endif
 
     #ifndef STATS
