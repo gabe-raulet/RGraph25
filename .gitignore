@@ -7,4 +7,5 @@ points
 rgraph
 rgraph_mpi
 ptgen
+perftest
 *.tar.gz

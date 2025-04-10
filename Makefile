@@ -27,7 +27,7 @@ ifeq ($(STATS),1)
 FLAGS+=-DSTATS
 endif
 
-all: rgraph rgraph_mpi ptgen
+all: rgraph rgraph_mpi perftest ptgen
 
 rgraph: rgraph.cpp
 	$(MPI_COMPILER) -o $@ -DDIM_SIZE=$(D) $(FLAGS) $(INCS) $<
@@ -35,8 +35,11 @@ rgraph: rgraph.cpp
 rgraph_mpi: rgraph_mpi.cpp
 	$(MPI_COMPILER) -o $@ -DDIM_SIZE=$(D) $(FLAGS) $(INCS) $<
 
+perftest: perftest.cpp
+	$(MPI_COMPILER) -o $@ -DDIM_SIZE=$(D) $(FLAGS) $(INCS) $<
+
 ptgen: ptgen.cpp
 	$(MPI_COMPILER) -o $@ -DDIM_SIZE=$(D) $(FLAGS) $(INCS) $<
 
 clean:
-	rm -rf rgraph rgraph_mpi ptgen *.out *.dSYM
+	rm -rf rgraph rgraph_mpi ptgen perftest *.out *.dSYM
