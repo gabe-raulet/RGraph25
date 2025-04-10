@@ -244,12 +244,10 @@ int main(int argc, char *argv[])
 
     MPI_Reduce(&my_n_edges, &n_edges, 1, MPI_INT64_T, MPI_SUM, 0, MPI_COMM_WORLD);
 
-    Real density, sparsity;
-    density = (n_edges+0.0)/totsize;
-    sparsity = density / totsize;
+    Real density = (n_edges+0.0)/totsize;
 
-    if (!myrank) fmt::print("[time={:.3f}] built epsilon graph [density={:.3f},sparsity={:.3f},edges={},imbalance={:.3f}]\n", maxtime, density, sparsity, n_edges, nprocs*max_compute_time/sum_compute_time);
-    if (!myrank) fmt::print("[time={:.3f}] start-to-finish [qps={:.3f}]\n", tottime, totsize/tottime);
+    if (!myrank) fmt::print("[time={:.3f}] built epsilon graph [density={:.3f},edges={},imbalance={:.3f}]\n", maxtime, density, n_edges, nprocs*max_compute_time/sum_compute_time);
+    if (!myrank) fmt::print("[time={:.3f}] start-to-finish [qps={:.1f}K]\n", tottime, totsize/(tottime*1000.));
 
     if (graph_fname)
     {
