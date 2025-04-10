@@ -54,6 +54,12 @@ int main(int argc, char *argv[])
     Index myoffset, totsize, mydistcomps = 0, distcomps;
     double t, maxtime, tottime = 0;
 
+    json stats;
+    json input, index_runtime;
+    std::vector<json> graphs_runtime;
+
+    const char *stats_fname = NULL;
+
     auto usage = [&] (int err, bool isroot)
     {
         if (isroot)
@@ -63,6 +69,7 @@ int main(int argc, char *argv[])
             fprintf(stderr, "         -l INT    leaf size [%lu]\n", (size_t)leaf_size);
             fprintf(stderr, "         -n INT    rebalance rate [%d]\n", (int)rebalance_rate);
             fprintf(stderr, "         -N INT    number of graphs [%d]\n", (int)num_graphs);
+            fprintf(stderr, "         -j FILE   json stats output\n");
             fprintf(stderr, "         -D FLOAT  damping factor [%.2f]\n", damping_factor);
             fprintf(stderr, "         -S FLOAT  sub factor (positive value supersedes -D) [%.2f]\n", sub_factor);
             fprintf(stderr, "         -R        choose sites randomly\n");
@@ -74,7 +81,7 @@ int main(int argc, char *argv[])
     };
 
     int c;
-    while ((c = getopt(argc, argv, "c:l:Rn:N:D:S:h")) >= 0)
+    while ((c = getopt(argc, argv, "c:l:j:Rn:N:D:S:h")) >= 0)
     {
         if      (c == 'c') cover = atof(optarg);
         else if (c == 'l') leaf_size = atoi(optarg);
@@ -83,6 +90,7 @@ int main(int argc, char *argv[])
         else if (c == 'N') num_graphs = atoi(optarg);
         else if (c == 'D') damping_factor = atof(optarg);
         else if (c == 'S') sub_factor = atof(optarg);
+        else if (c == 'j') stats_fname = optarg;
         else if (c == 'h') usage(0, !myrank);
     }
 
@@ -103,6 +111,15 @@ int main(int argc, char *argv[])
     Index n = mypoints.size();
     Index m = num_sites;
 
+    input["filename"] = points_fname;
+    input["nprocs"] = nprocs;
+    input["cover"] = cover;
+    input["leaf"] = leaf_size;
+    input["num_sites"] = num_sites;
+    input["random_sites"] = random_sites;
+    input["num_points"] = totsize;
+    input["rebalance_rate"] = rebalance_rate;
+
     /*
      * Build Voronoi diagram
      */
@@ -120,6 +137,9 @@ int main(int argc, char *argv[])
 
     MPI_Reduce(&t, &maxtime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
     if (!myrank) fmt::print("[time={:.3f}] built r-net Voronoi diagram [sep={:.3f},num_sites={},farthest={}]\n", maxtime, diagram.get_radius(), diagram.num_sites(), diagram.get_farthest());
+
+    index_runtime["sep"] = diagram.get_radius();
+    index_runtime["farthest"] = diagram.get_farthest();
 
     /*
      * Compute tree points
@@ -140,6 +160,7 @@ int main(int argc, char *argv[])
     tottime += maxtime;
 
     if (!myrank) fmt::print("[time={:.3f}] computed ghost points [treepts={},ghostpts={},pts_per_tree={:.1f},ghosts_per_tree={:.1f}]\n", maxtime, totsize, num_ghost_points, totsize/(num_sites+0.0), num_ghost_points/(num_sites+0.0));
+    index_runtime["ghostpts"] = num_ghost_points;
 
     /*
      * Exchange points
@@ -200,6 +221,8 @@ int main(int argc, char *argv[])
     for (Index iter = 0; iter < num_graphs; ++iter)
     {
         std::vector<GhostTree> trees = ghost_trees;
+        graphs_runtime.emplace_back();
+        json& graph_runtime = graphs_runtime.back();
 
         MPI_Barrier(MPI_COMM_WORLD);
         t = -MPI_Wtime();
@@ -209,6 +232,7 @@ int main(int argc, char *argv[])
 
         Index my_n_edges = 0, n_edges;
         int done = 0;
+        Index num_rebalances = 0;
 
         do
         {
@@ -229,6 +253,7 @@ int main(int argc, char *argv[])
                 std::vector<GhostTree> recv_trees;
                 rebalance_trees(tree, num_left, recv_trees, MPI_COMM_WORLD);
                 std::swap(trees, recv_trees);
+                num_rebalances++;
             }
 
         } while (!done);
@@ -242,8 +267,23 @@ int main(int argc, char *argv[])
 
         if (!myrank) fmt::print("[time={:.3f}] built epsilon graph [epsilon={:.3f},density={:.3f},edges={}]\n", maxtime, epsilon, density, n_edges);
 
+        graph_runtime["epsilon"] = epsilon;
+        graph_runtime["num_edges"] = n_edges;
+        graph_runtime["num_rebalances"] = num_rebalances;
+
         if (sub_factor < 0) epsilon *= damping_factor;
         else epsilon -= sub_factor;
+    }
+
+    stats["input"] = input;
+    stats["index_runtime"] = index_runtime;
+    stats["graphs_runtime"] = graphs_runtime;
+
+    if (stats_fname && !myrank)
+    {
+        std::ofstream f(stats_fname);
+        f << std::setw(4) << stats << std::endl;
+        f.close();
     }
 
     MPI_Finalize();
