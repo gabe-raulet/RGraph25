@@ -109,8 +109,8 @@ int main(int argc, char *argv[])
     density = (n_edges+0.0)/n;
     sparsity = density/n;
 
-    fmt::print("[time={:.3f}] built epsilon graph [density={:.3f},edges={},qps={:.3f}]\n", t, density, n_edges, n/t);
-    fmt::print("[time={:.3f}] start-to-finish [qps={:.3f}]\n", tottime, n/tottime);
+    fmt::print("[time={:.3f}] built epsilon graph [density={:.3f},edges={},qps={:.1f}K]\n", t, density, n_edges, n/(t*1000));
+    fmt::print("[time={:.3f}] start-to-finish [qps={:.1f}K]\n", tottime, n/(tottime*1000.));
 
     if (verify_graph)
     {
@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
         bool correct = check_correctness(points, graph, epsilon);
         t += omp_get_wtime();
 
-        fmt::print("[time={:.3f}] {} correctness check [qps={:.3f}]\n", t, correct? "PASSED" : "FAILED", n/t);
+        fmt::print("[time={:.3f}] {} correctness check [qps={:.1f}K]\n", t, correct? "PASSED" : "FAILED", n/(t*1000));
     }
 
     if (graph_fname)
