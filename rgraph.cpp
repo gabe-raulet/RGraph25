@@ -40,6 +40,7 @@ int main(int argc, char *argv[])
 
     PointVector points;
     double t, tottime = 0;
+    Index distcomps = 0;
 
     auto usage = [&] (int err)
     {
@@ -80,13 +81,13 @@ int main(int argc, char *argv[])
     read_fvecs(points, points_fname);
 
     t = -omp_get_wtime();
-    tree.build(points, covering_factor, leaf_size);
+    tree.build(points, covering_factor, leaf_size, distcomps);
     t += omp_get_wtime();
     tottime += t;
 
     /* tree.print_tree(); */
 
-    fmt::print("[time={:.3f}] built cover tree [vertices={}]\n", t, tree.num_vertices());
+    fmt::print("[time={:.3f}] built cover tree [vertices={},distcomps={:.1f}M]\n", t, tree.num_vertices(), distcomps/1000000.);
 
     t = -omp_get_wtime();
 
@@ -95,30 +96,36 @@ int main(int argc, char *argv[])
 
     graph.resize(n);
 
-    #pragma omp parallel for schedule(dynamic) reduction(+:n_edges)
+    Index tot_distcomps = distcomps;
+    distcomps = 0;
+
+    #pragma omp parallel for schedule(dynamic) reduction(+:n_edges) reduction(+:distcomps)
     for (Index i = 0; i < n; ++i)
     {
-        tree.range_query(graph[i], points[i], epsilon);
+        tree.range_query(graph[i], points[i], epsilon, distcomps);
         n_edges += graph[i].size();
     }
 
     t += omp_get_wtime();
     tottime += t;
+    tot_distcomps += distcomps;
 
     Real density, sparsity;
     density = (n_edges+0.0)/n;
     sparsity = density/n;
 
-    fmt::print("[time={:.3f}] built epsilon graph [density={:.3f},edges={},qps={:.1f}K]\n", t, density, n_edges, n/(t*1000));
-    fmt::print("[time={:.3f}] start-to-finish [qps={:.1f}K]\n", tottime, n/(tottime*1000.));
+    fmt::print("[time={:.3f}] built epsilon graph [density={:.3f},edges={},qps={:.1f}K,distcomps={:.1f}M]\n", t, density, n_edges, n/(t*1000), distcomps/1000000.);
+    fmt::print("[time={:.3f}] start-to-finish [qps={:.1f}K,distcomps={:.1f}M]\n", tottime, n/(tottime*1000.), tot_distcomps/1000000.);
 
     if (verify_graph)
     {
+        distcomps = 0;
+
         t = -omp_get_wtime();
-        bool correct = check_correctness(points, graph, epsilon);
+        bool correct = check_correctness(points, graph, epsilon, distcomps);
         t += omp_get_wtime();
 
-        fmt::print("[time={:.3f}] {} correctness check [qps={:.1f}K]\n", t, correct? "PASSED" : "FAILED", n/(t*1000));
+        fmt::print("[time={:.3f}] {} correctness check [qps={:.1f}K,distcomps={:.1f}M]\n", t, correct? "PASSED" : "FAILED", n/(t*1000), distcomps/1000000.);
     }
 
     if (graph_fname)

@@ -49,7 +49,7 @@ int main(int argc, char *argv[])
     const char *graph_fname = NULL;
 
     PointVector mypoints;
-    Index myoffset, totsize;
+    Index myoffset, totsize, mydistcomps = 0, tot_distcomps = 0, distcomps;
     double t, maxtime, tottime = 0;
 
     auto usage = [&] (int err, bool isroot)
@@ -106,16 +106,19 @@ int main(int argc, char *argv[])
 
     VoronoiDiagram diagram(mypoints.data(), mypoints.size(), myoffset, MPI_COMM_WORLD);
 
-    if (random_sites) diagram.build_random_diagram(m);
-    else diagram.build_greedy_diagram(m);
+    if (random_sites) diagram.build_random_diagram(m, mydistcomps);
+    else diagram.build_greedy_diagram(m, mydistcomps);
 
-    diagram.build_replication_tree(cover, leaf_size);
+    diagram.build_replication_tree(cover, leaf_size, mydistcomps);
 
     t += MPI_Wtime();
     MPI_Reduce(&t, &maxtime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
     tottime += maxtime;
 
-    if (!myrank) fmt::print("[time={:.3f}] built r-net Voronoi diagram [sep={:.3f},num_sites={},farthest={}]\n", maxtime, diagram.get_radius(), diagram.num_sites(), diagram.get_farthest());
+    MPI_Reduce(&mydistcomps, &distcomps, 1, MPI_INT64_T, MPI_SUM, 0, MPI_COMM_WORLD);
+    tot_distcomps += distcomps;
+
+    if (!myrank) fmt::print("[time={:.3f}] built r-net Voronoi diagram [sep={:.3f},num_sites={},farthest={},distcomps={:.1f}M]\n", maxtime, diagram.get_radius(), diagram.num_sites(), diagram.get_farthest(), distcomps/1000000.);
 
     /*
      * Compute tree points
@@ -123,19 +126,23 @@ int main(int argc, char *argv[])
 
     Index num_ghost_points;
     IndexVector sendtreeids, sendtreeptrs, sendghostids, sendghostptrs;
+    mydistcomps = 0;
 
     MPI_Barrier(MPI_COMM_WORLD);
     t = -MPI_Wtime();
 
     diagram.compute_my_tree_points(sendtreeids, sendtreeptrs);
-    num_ghost_points = diagram.compute_my_ghost_points(epsilon, sendghostids, sendghostptrs);
+    num_ghost_points = diagram.compute_my_ghost_points(epsilon, sendghostids, sendghostptrs, mydistcomps);
 
     t += MPI_Wtime();
 
     MPI_Reduce(&t, &maxtime, 1, MPI_INT64_T, MPI_MAX, 0, MPI_COMM_WORLD);
     tottime += maxtime;
 
-    if (!myrank) fmt::print("[time={:.3f}] computed ghost points [treepts={},ghostpts={},pts_per_tree={:.1f},ghosts_per_tree={:.1f}]\n", maxtime, totsize, num_ghost_points, totsize/(num_sites+0.0), num_ghost_points/(num_sites+0.0));
+    MPI_Reduce(&mydistcomps, &distcomps, 1, MPI_INT64_T, MPI_SUM, 0, MPI_COMM_WORLD);
+    tot_distcomps += distcomps;
+
+    if (!myrank) fmt::print("[time={:.3f}] computed ghost points [treepts={},ghostpts={},pts_per_tree={:.1f},ghosts_per_tree={:.1f},distcomps={:.1f}M]\n", maxtime, totsize, num_ghost_points, totsize/(num_sites+0.0), num_ghost_points/(num_sites+0.0), distcomps/1000000.);
 
     /*
      * Exchange points
@@ -169,6 +176,7 @@ int main(int argc, char *argv[])
 
     Index s = mysites.size();
     std::vector<GhostTree> ghost_trees(s);
+    mydistcomps = 0;
 
     for (Index i = 0; i < s; ++i)
     {
@@ -179,7 +187,7 @@ int main(int argc, char *argv[])
         auto i2 = mytreeids.begin() + mytreeptrs[i+1];
 
         Index cellsize = diagram.get_cell_size(mysites[i]);
-        ghost_trees[i].build(p1, p2, i1, i2, cellsize, mysites[i], cover, leaf_size);
+        ghost_trees[i].build(p1, p2, i1, i2, cellsize, mysites[i], cover, leaf_size, mydistcomps);
     }
 
     t += MPI_Wtime();
@@ -187,7 +195,10 @@ int main(int argc, char *argv[])
     MPI_Reduce(&t, &maxtime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
     tottime += maxtime;
 
-    if (!myrank) fmt::print("[time={:.3f}] computed ghost trees\n", maxtime);
+    MPI_Reduce(&mydistcomps, &distcomps, 1, MPI_INT64_T, MPI_SUM, 0, MPI_COMM_WORLD);
+    tot_distcomps += distcomps;
+
+    if (!myrank) fmt::print("[time={:.3f}] computed ghost trees [distcomps={:.1f}M]\n", maxtime, distcomps/1000000.);
 
     /*
      * Build epsilon graph
@@ -207,6 +218,7 @@ int main(int argc, char *argv[])
 
     double t2 = 0, t3;
     double max_compute_time, sum_compute_time;
+    mydistcomps = 0;
 
     do
     {
@@ -216,7 +228,7 @@ int main(int argc, char *argv[])
         t3 = -MPI_Wtime();
         for (Index i = 0; i < rebalance_rate && num_left > 0; ++i, ++tree, --num_left)
         {
-            my_n_edges += tree->graph_query(mygraph, myids, epsilon);
+            my_n_edges += tree->graph_query(mygraph, myids, epsilon, mydistcomps);
         }
         t3 += MPI_Wtime();
         t2 += t3;
@@ -244,10 +256,13 @@ int main(int argc, char *argv[])
 
     MPI_Reduce(&my_n_edges, &n_edges, 1, MPI_INT64_T, MPI_SUM, 0, MPI_COMM_WORLD);
 
+    MPI_Reduce(&mydistcomps, &distcomps, 1, MPI_INT64_T, MPI_SUM, 0, MPI_COMM_WORLD);
+    tot_distcomps += distcomps;
+
     Real density = (n_edges+0.0)/totsize;
 
-    if (!myrank) fmt::print("[time={:.3f}] built epsilon graph [density={:.3f},edges={},imbalance={:.3f}]\n", maxtime, density, n_edges, nprocs*max_compute_time/sum_compute_time);
-    if (!myrank) fmt::print("[time={:.3f}] start-to-finish [qps={:.1f}K]\n", tottime, totsize/(tottime*1000.));
+    if (!myrank) fmt::print("[time={:.3f}] built epsilon graph [density={:.3f},edges={},imbalance={:.3f},distcomps={:.1f}M]\n", maxtime, density, n_edges, nprocs*max_compute_time/sum_compute_time, distcomps/1000000.);
+    if (!myrank) fmt::print("[time={:.3f}] start-to-finish [qps={:.1f}K,distcomps={:.1f}M]\n", tottime, totsize/(tottime*1000.), tot_distcomps/1000000.);
 
     if (graph_fname)
     {

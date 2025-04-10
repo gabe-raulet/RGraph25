@@ -12,10 +12,10 @@ struct Hub
 
     Index size() const { return ids.size(); }
 
-    void compute_child_hubs(const PointVector& points, Real cover, Index leaf_size, Real maxdist);
+    void compute_child_hubs(const PointVector& points, Real cover, Index leaf_size, Real maxdist, Index& distcomps);
 };
 
-void Hub::compute_child_hubs(const PointVector& points, Real cover, Index leaf_size, Real maxdist)
+void Hub::compute_child_hubs(const PointVector& points, Real cover, Index leaf_size, Real maxdist, Index& distcomps)
 {
     Real sep;
     Index m = size();
@@ -47,6 +47,8 @@ void Hub::compute_child_hubs(const PointVector& points, Real cover, Index leaf_s
                 candidate = ids[j];
             }
         }
+
+        distcomps += m;
 
     } while (sep > target);
 
@@ -82,7 +84,7 @@ void Hub::compute_child_hubs(const PointVector& points, Real cover, Index leaf_s
     }
 }
 
-void CoverTree::build(const PointVector& points, Real cover, Index leaf_size)
+void CoverTree::build(const PointVector& points, Real cover, Index leaf_size, Index& distcomps)
 {
     struct BuildVertex
     {
@@ -120,6 +122,8 @@ void CoverTree::build(const PointVector& points, Real cover, Index leaf_size)
         }
     }
 
+    distcomps += n;
+
     Real maxdist = root_hub.radius;
 
     std::vector<BuildVertex> verts;
@@ -134,7 +138,7 @@ void CoverTree::build(const PointVector& points, Real cover, Index leaf_size)
     {
         Hub hub = hubs.front(); hubs.pop_front();
 
-        hub.compute_child_hubs(points, cover, leaf_size, maxdist);
+        hub.compute_child_hubs(points, cover, leaf_size, maxdist, distcomps);
 
         for (Hub& child : hub.children)
         {
@@ -199,7 +203,7 @@ void CoverTree::build(const PointVector& points, Real cover, Index leaf_size)
     }
 }
 
-Index CoverTree::range_query(IndexVector& neighbors, const Point& query, Real radius) const
+Index CoverTree::range_query(IndexVector& neighbors, const Point& query, Real radius, Index& distcomps) const
 {
     neighbors.clear();
     std::deque<Index> queue = {0};
@@ -218,6 +222,8 @@ Index CoverTree::range_query(IndexVector& neighbors, const Point& query, Real ra
             }
         }
 
+        distcomps += u_vtx.num_leaves;
+
         for (Index i = u_vtx.child_ptr; i < u_vtx.child_ptr + u_vtx.num_children; ++i)
         {
             Index v = children[i];
@@ -230,22 +236,24 @@ Index CoverTree::range_query(IndexVector& neighbors, const Point& query, Real ra
                 queue.push_back(v);
             }
         }
+
+        distcomps += u_vtx.num_children;
     }
 
     return neighbors.size();
 }
 
 template <class PointIter, class IndexIter>
-void GhostTree::build(PointIter p1, PointIter p2, IndexIter i1, IndexIter i2, Index cellsize, Index site, Real cover, Index leaf_size)
+void GhostTree::build(PointIter p1, PointIter p2, IndexIter i1, IndexIter i2, Index cellsize, Index site, Real cover, Index leaf_size, Index& distcomps)
 {
     points.assign(p1, p2);
     ids.assign(i1, i2);
     this->site = site;
-    tree.build(points, cover, leaf_size);
+    tree.build(points, cover, leaf_size, distcomps);
     points.resize(cellsize);
 }
 
-Index GhostTree::graph_query(IndexVectorVector& graph, IndexVector& graphids, Real radius) const
+Index GhostTree::graph_query(IndexVectorVector& graph, IndexVector& graphids, Real radius, Index& distcomps) const
 {
     Index n_edges = 0;
     Index cellsize = points.size();
@@ -254,7 +262,7 @@ Index GhostTree::graph_query(IndexVectorVector& graph, IndexVector& graphids, Re
     {
         graph.emplace_back();
         graphids.push_back(ids[i]);
-        n_edges += tree.range_query(graph.back(), points[i], radius);
+        n_edges += tree.range_query(graph.back(), points[i], radius, distcomps);
         std::for_each(graph.back().begin(), graph.back().end(), [&](Index& id) { id = ids[id]; });
     }
 

@@ -30,9 +30,8 @@ class CoverTree
         Index num_vertices() const { return vertices.size(); }
         Index num_points() const { return n; }
 
-        void build(const PointVector& points, Real cover, Index leaf_size);
-
-        Index range_query(IndexVector& neighbors, const Point& query, Real radius) const;
+        void build(const PointVector& points, Real cover, Index leaf_size, Index& distcomps);
+        Index range_query(IndexVector& neighbors, const Point& query, Real radius, Index& distcomps) const;
 
     private:
 
@@ -54,9 +53,9 @@ class GhostTree
         Index num_points() const { return tree.num_points(); }
 
         template <class PointIter, class IndexIter>
-        void build(PointIter p1, PointIter p2, IndexIter i1, IndexIter i2, Index cellsize, Index site, Real cover, Index leaf_size);
+        void build(PointIter p1, PointIter p2, IndexIter i1, IndexIter i2, Index cellsize, Index site, Real cover, Index leaf_size, Index& distcomps);
 
-        Index graph_query(IndexVectorVector& graph, IndexVector& graphids, Real radius) const;
+        Index graph_query(IndexVectorVector& graph, IndexVector& graphids, Real radius, Index& distcomps) const;
 
         int get_packed_bufsize() const;
         int pack_tree(char *buf, MPI_Comm comm) const;

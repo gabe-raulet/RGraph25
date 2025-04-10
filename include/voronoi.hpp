@@ -39,7 +39,7 @@ void VoronoiDiagram::create_mpi_argmax(MPI_Op *MPI_ARGMAX)
     MPI_Op_create(&mpi_argmax, 1, MPI_ARGMAX);
 }
 
-void VoronoiDiagram::build_random_diagram(Index m)
+void VoronoiDiagram::build_random_diagram(Index m, Index& mydistcomps)
 {
     int myrank, nprocs;
     MPI_Comm_rank(comm, &myrank);
@@ -85,6 +85,8 @@ void VoronoiDiagram::build_random_diagram(Index m)
         }
     }
 
+    mydistcomps += m*mysize;
+
     Ball ball;
 
     ball.id = (std::max_element(mydists.begin(), mydists.end()) - mydists.begin()) + myoffset;
@@ -106,7 +108,7 @@ void VoronoiDiagram::build_random_diagram(Index m)
     MPI_Op_free(&MPI_ARGMAX);
 }
 
-void VoronoiDiagram::build_greedy_diagram(Index m)
+void VoronoiDiagram::build_greedy_diagram(Index m, Index& mydistcomps)
 {
     int myrank, nprocs;
     MPI_Comm_rank(comm, &myrank);
@@ -175,6 +177,8 @@ void VoronoiDiagram::build_greedy_diagram(Index m)
         MPI_Allreduce(MPI_IN_PLACE, &ball, 1, MPI_BALL, MPI_ARGMAX, comm);
     }
 
+    mydistcomps += m*mysize;
+
     farthest = ball.id;
     radius = ball.radius;
 
@@ -191,14 +195,14 @@ void VoronoiDiagram::build_greedy_diagram(Index m)
     MPI_Op_free(&MPI_ARGMAX);
 }
 
-void VoronoiDiagram::build_replication_tree(Real covering_factor, Index leaf_size)
+void VoronoiDiagram::build_replication_tree(Real covering_factor, Index leaf_size, Index& mydistcomps)
 {
-    reptree.build(site_points, covering_factor, leaf_size);
+    reptree.build(site_points, covering_factor, leaf_size, mydistcomps);
 }
 
-void VoronoiDiagram::find_ghost_neighbors(IndexVector& neighbors, Index query, Real epsilon) const
+void VoronoiDiagram::find_ghost_neighbors(IndexVector& neighbors, Index query, Real epsilon, Index& mydistcomps) const
 {
-    reptree.range_query(neighbors, mypoints[query], mydists[query] + 2*epsilon);
+    reptree.range_query(neighbors, mypoints[query], mydists[query] + 2*epsilon, mydistcomps);
 
     auto it = std::remove_if(neighbors.begin(), neighbors.end(), [&](Index id) { return id == mycells[query]; });
     neighbors.erase(it, neighbors.end());
@@ -221,7 +225,7 @@ void VoronoiDiagram::compute_my_tree_points(IndexVector& mytreeids, IndexVector&
     }
 }
 
-Index VoronoiDiagram::compute_my_ghost_points(Real epsilon, IndexVector& myghostids, IndexVector& myghostptrs) const
+Index VoronoiDiagram::compute_my_ghost_points(Real epsilon, IndexVector& myghostids, IndexVector& myghostptrs, Index& mydistcomps) const
 {
     int myrank, nprocs;
     MPI_Comm_rank(comm, &myrank);
@@ -235,7 +239,7 @@ Index VoronoiDiagram::compute_my_ghost_points(Real epsilon, IndexVector& myghost
 
     for (Index p = 0; p < mysize; ++p)
     {
-        find_ghost_neighbors(myneighbors[p], p, epsilon);
+        find_ghost_neighbors(myneighbors[p], p, epsilon, mydistcomps);
 
         for (Index j : myneighbors[p])
             myghostcounts[j]++;
@@ -288,8 +292,6 @@ void VoronoiDiagram::exchange_points(const IndexVector& sendtreeids, const Index
     MPI_Datatype MPI_POINT, MPI_POINT_ENVELOPE;
 
     create_mpi_point(&MPI_POINT);
-    /* MPI_Type_contiguous(DIM_SIZE, MPI_FLOAT, &MPI_POINT); */
-    /* MPI_Type_commit(&MPI_POINT); */
 
     int blklens[3] = {1,2,1};
     MPI_Aint disps[3] = {offsetof(PointEnvelope, point), offsetof(PointEnvelope, id), offsetof(PointEnvelope, ghost)};

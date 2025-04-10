@@ -153,7 +153,7 @@ void write_fvecs(const PointVector& points, const char *fname)
     os.close();
 }
 
-bool check_correctness(const PointVector& points, IndexVectorVector& graph, Real epsilon)
+bool check_correctness(const PointVector& points, IndexVectorVector& graph, Real epsilon, Index& distcomps)
 {
     Distance distance;
 
@@ -161,6 +161,8 @@ bool check_correctness(const PointVector& points, IndexVectorVector& graph, Real
     Index n = points.size();
 
     assert((n == points.size()));
+
+    distcomps += n*n;
 
     #pragma omp parallel for shared(correct)
     for (Index i = 0; i < n; ++i)

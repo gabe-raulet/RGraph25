@@ -41,7 +41,7 @@ void read_fvecs(PointVector& mypoints, Index& myoffset, Index& totsize, const ch
 
 void write_fvecs(const PointVector& points, const char *fname);
 
-bool check_correctness(const PointVector& points, IndexVectorVector& graph, Real epsilon);
+bool check_correctness(const PointVector& points, IndexVectorVector& graph, Real epsilon, Index& distcomps);
 
 #include "utils.hpp"
 

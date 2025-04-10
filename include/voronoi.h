@@ -12,13 +12,13 @@ class VoronoiDiagram
 
         VoronoiDiagram(const Point *mypoints, Index mysize, Index myoffset, MPI_Comm comm);
 
-        void build_random_diagram(Index m);
-        void build_greedy_diagram(Index m);
-        void build_replication_tree(Real cover, Index leaf_size);
+        void build_random_diagram(Index m, Index& mydistcomps);
+        void build_greedy_diagram(Index m, Index& mydistcomps);
+        void build_replication_tree(Real cover, Index leaf_size, Index& mydistcomps);
 
-        void find_ghost_neighbors(IndexVector& neighbors, Index query, Real epsilon) const;
+        void find_ghost_neighbors(IndexVector& neighbors, Index query, Real epsilon, Index& mydistcomps) const;
         void compute_my_tree_points(IndexVector& mytreeids, IndexVector& mytreeptrs) const;
-        Index compute_my_ghost_points(Real epsilon, IndexVector& myghostids, IndexVector& myghostptrs) const;
+        Index compute_my_ghost_points(Real epsilon, IndexVector& myghostids, IndexVector& myghostptrs, Index& mydistcomps) const;
         void exchange_points(const IndexVector& sendtreeids, const IndexVector& sendtreeptrs, const IndexVector& sendghostids, const IndexVector& sendghostptrs, const IndexVector& assignments, IndexVector& mysites, IndexVector& mytreeids, IndexVector& mytreeptrs, PointVector& mytreepts) const;
 
         Index num_points() const { return mysize; }
