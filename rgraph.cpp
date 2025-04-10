@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
         bool correct = check_correctness(points, graph, epsilon);
         t += omp_get_wtime();
 
-        fmt::print("[time={:.3f}] {} correctness check\n", t, correct? "PASSED" : "FAILED");
+        fmt::print("[time={:.3f}] {} correctness check [qps={:.3f}]\n", t, correct? "PASSED" : "FAILED", n/t);
     }
 
     if (graph_fname)
