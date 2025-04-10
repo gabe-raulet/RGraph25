@@ -27,6 +27,7 @@ def write_file(points, fname):
 
 def main(ifname, ofname, start, size):
     points = read_file(ifname)
+    np.random.shuffle(points)
     points = points[start:start+size]
     write_file(points, ofname)
     return 0

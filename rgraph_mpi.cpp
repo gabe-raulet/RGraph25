@@ -205,15 +205,21 @@ int main(int argc, char *argv[])
     Index my_n_edges = 0, n_edges;
     int done = 0;
 
+    double t2 = 0, t3;
+    double max_compute_time, sum_compute_time;
+
     do
     {
         const GhostTree *tree = ghost_trees.data();
         Index num_left = ghost_trees.size();
 
+        t3 = -MPI_Wtime();
         for (Index i = 0; i < rebalance_rate && num_left > 0; ++i, ++tree, --num_left)
         {
             my_n_edges += tree->graph_query(mygraph, myids, epsilon);
         }
+        t3 += MPI_Wtime();
+        t2 += t3;
 
         done = !!(num_left == 0);
 
@@ -231,6 +237,9 @@ int main(int argc, char *argv[])
     t += MPI_Wtime();
 
     MPI_Reduce(&t, &maxtime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&t2, &max_compute_time, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&t2, &sum_compute_time, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+
     tottime += maxtime;
 
     MPI_Reduce(&my_n_edges, &n_edges, 1, MPI_INT64_T, MPI_SUM, 0, MPI_COMM_WORLD);
@@ -239,7 +248,7 @@ int main(int argc, char *argv[])
     density = (n_edges+0.0)/totsize;
     sparsity = density / totsize;
 
-    if (!myrank) fmt::print("[time={:.3f}] built epsilon graph [density={:.3f},sparsity={:.3f},edges={}]\n", maxtime, density, sparsity, n_edges);
+    if (!myrank) fmt::print("[time={:.3f}] built epsilon graph [density={:.3f},sparsity={:.3f},edges={},imbalance={:.3f}]\n", maxtime, density, sparsity, n_edges, nprocs*max_compute_time/sum_compute_time);
     if (!myrank) fmt::print("[time={:.3f}] start-to-finish [qps={:.3f}]\n", tottime, totsize/tottime);
 
     if (graph_fname)
