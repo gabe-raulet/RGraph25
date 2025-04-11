@@ -379,7 +379,6 @@ void rebalance_trees(const GhostTree *send_trees, int sendcount, std::vector<Gho
     IndexVector send_sites(sendcounts.back() + sdispls.back());
     std::vector<int> send_sizes(sendcounts.back() + sdispls.back());
     int tot_send_size = 0;
-    Index c = 0;
 
     std::vector<int> ptrs = sdispls;
 
@@ -391,11 +390,7 @@ void rebalance_trees(const GhostTree *send_trees, int sendcount, std::vector<Gho
         send_sites[loc] = send_trees[i].get_site();
         send_sizes[loc] = send_trees[i].get_packed_bufsize();
         tot_send_size += send_sizes[loc];
-        c += send_sizes[loc];
     }
-
-    std::cout << tot_send_size << std::endl;
-    std::cout << c << std::endl;
 
     MPI_Alltoall(sendcounts.data(), 1, MPI_INT, recvcounts.data(), 1, MPI_INT, MPI_COMM_WORLD);
 

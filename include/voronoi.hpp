@@ -36,7 +36,7 @@ void VoronoiDiagram::create_mpi_ball(MPI_Datatype *MPI_BALL)
 
 void VoronoiDiagram::create_mpi_argmax(MPI_Op *MPI_ARGMAX)
 {
-    MPI_Op_create(&mpi_argmax, 1, MPI_ARGMAX);
+    MPI_Op_create(&mpi_argmax, 0, MPI_ARGMAX);
 }
 
 void VoronoiDiagram::build_random_diagram(Index m, Index& mydistcomps)
@@ -259,9 +259,6 @@ Index VoronoiDiagram::compute_my_ghost_points(Real epsilon, IndexVector& myghost
             myghostids[ptrs[j]++] = p + myoffset;
 
     return my_num_ghost_points;
-    /* MPI_Allreduce(&my_num_ghost_points, &num_ghost_points, 1, MPI_INT64_T, MPI_SUM, comm); */
-
-    /* return num_ghost_points; */
 }
 
 void VoronoiDiagram::exchange_points(const IndexVector& sendtreeids, const IndexVector& sendtreeptrs, const IndexVector& sendghostids, const IndexVector& sendghostptrs, const IndexVector& assignments, IndexVector& mysites, IndexVector& mytreeids, IndexVector& mytreeptrs, PointVector& mytreepts) const
