@@ -280,9 +280,10 @@ Index GhostTree::graph_query(IndexVectorVector& graph, IndexVector& graphids, Re
                 {
                     graph.back().push_back(ids[tree.leaves[j]]);
                 }
+
+                distcomps++;
             }
 
-            distcomps += u_vtx.num_leaves;
 
             for (Index j = u_vtx.child_ptr; j < u_vtx.child_ptr + u_vtx.num_children; ++j)
             {
