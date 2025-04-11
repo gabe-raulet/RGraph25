@@ -254,8 +254,6 @@ int main(int argc, char *argv[])
     tottime += maxtime;
 
     MPI_Reduce(&my_n_edges, &n_edges, 1, MPI_INT64_T, MPI_SUM, 0, MPI_COMM_WORLD);
-    n_edges = 2*n_edges + totsize;
-
     MPI_Reduce(&mydistcomps, &distcomps, 1, MPI_INT64_T, MPI_SUM, 0, MPI_COMM_WORLD);
     tot_distcomps += distcomps;
 

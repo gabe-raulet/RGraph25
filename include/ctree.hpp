@@ -304,7 +304,7 @@ Index GhostTree::graph_query(IndexVectorVector& graph, IndexVector& graphids, Re
         n_edges += graph.back().size();
     }
 
-    return n_edges;
+    return 2*n_edges + cellsize;
 }
 
 int GhostTree::get_packed_bufsize() const
