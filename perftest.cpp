@@ -105,10 +105,6 @@ int main(int argc, char *argv[])
     Index myoffset, totsize, mydistcomps = 0, distcomps;
     double t, maxtime, tottime = 0;
 
-    /* json stats; */
-    /* json input, index_runtime; */
-    /* std::vector<json> graphs_runtime; */
-
     StatsCollector stats;
 
     const char *stats_fname = NULL;
@@ -284,8 +280,6 @@ int main(int argc, char *argv[])
     for (Index iter = 0; iter < num_graphs; ++iter)
     {
         std::vector<GhostTree> trees = ghost_trees;
-        /* graphs_runtime.emplace_back(); */
-        /* json& graph_runtime = graphs_runtime.back(); */
 
         MPI_Barrier(MPI_COMM_WORLD);
         t = -MPI_Wtime();
@@ -346,29 +340,13 @@ int main(int argc, char *argv[])
 
         if (!myrank) fmt::print("[time={:.3f}] built epsilon graph [epsilon={:.3f},density={:.3f},edges={}]\n", maxtime, epsilon, density, n_edges);
 
-        /* graph_runtime["epsilon"] = epsilon; */
-        /* graph_runtime["num_edges"] = n_edges; */
-        /* graph_runtime["num_rebalances"] = num_rebalances; */
-
         stats.push_graph_stats(epsilon, num_rebalances, my_n_edges, my_query_time, my_rebalance_time, mydistcomps);
 
         if (sub_factor < 0) epsilon *= damping_factor;
         else epsilon -= sub_factor;
     }
 
-    /* stats["input"] = input; */
-    /* stats["index_runtime"] = index_runtime; */
-    /* stats["graphs_runtime"] = graphs_runtime; */
-
     stats.write_json(stats_fname, MPI_COMM_WORLD);
-
-    /* if (stats_fname && !myrank) */
-    /* { */
-        /* std::ofstream f(stats_fname); */
-        /* f << std::setw(4) << stats << std::endl; */
-        /* f.close(); */
-    /* } */
-
 
     MPI_Finalize();
     return 0;
@@ -401,6 +379,7 @@ void rebalance_trees(const GhostTree *send_trees, int sendcount, std::vector<Gho
     IndexVector send_sites(sendcounts.back() + sdispls.back());
     std::vector<int> send_sizes(sendcounts.back() + sdispls.back());
     int tot_send_size = 0;
+    Index c = 0;
 
     std::vector<int> ptrs = sdispls;
 
@@ -412,7 +391,11 @@ void rebalance_trees(const GhostTree *send_trees, int sendcount, std::vector<Gho
         send_sites[loc] = send_trees[i].get_site();
         send_sizes[loc] = send_trees[i].get_packed_bufsize();
         tot_send_size += send_sizes[loc];
+        c += send_sizes[loc];
     }
+
+    std::cout << tot_send_size << std::endl;
+    std::cout << c << std::endl;
 
     MPI_Alltoall(sendcounts.data(), 1, MPI_INT, recvcounts.data(), 1, MPI_INT, MPI_COMM_WORLD);
 
@@ -489,12 +472,6 @@ void StatsCollector::write_json(const char *json_fname, MPI_Comm comm)
         double exchange_points_time;
         double tree_build_time;
 
-        /* IndexVector num_edges; */
-        /* IndexVector distcomps; */
-
-        /* DoubleVector query_times; */
-        /* DoubleVector rebalance_times; */
-
         json get_json() const
         {
             json obj;
@@ -507,12 +484,6 @@ void StatsCollector::write_json(const char *json_fname, MPI_Comm comm)
             obj["ghost_points_time"] = ghost_points_time;
             obj["exchange_points_time"] = exchange_points_time;
             obj["tree_build_time"] = tree_build_time;
-
-            /* obj["my_num_edges"] = num_edges; */
-            /* obj["my_distcomps"] = distcomps; */
-
-            /* obj["my_query_times"] = query_times; */
-            /* obj["my_rebalance_times"] = rebalance_times; */
 
             return obj;
         }
@@ -538,11 +509,6 @@ void StatsCollector::write_json(const char *json_fname, MPI_Comm comm)
     my_rank_stats.ghost_points_time = my_ghost_points_time;
     my_rank_stats.exchange_points_time = my_exchange_points_time;
     my_rank_stats.tree_build_time = my_tree_build_time;
-
-    /* my_rank_stats.num_edges = my_num_edges; */
-    /* my_rank_stats.distcomps = my_distcomps; */
-    /* my_rank_stats.query_times = my_query_times; */
-    /* my_rank_stats.rebalance_times = my_rebalance_times; */
 
     IndexVector num_edges, distcomps;
     DoubleVector query_times, rebalance_times;
@@ -588,12 +554,6 @@ void StatsCollector::write_json(const char *json_fname, MPI_Comm comm)
             rank_stats_json.push_back(o.get_json());
         }
 
-            /* obj["my_num_edges"] = num_edges; */
-            /* obj["my_distcomps"] = distcomps; */
-
-            /* obj["my_query_times"] = query_times; */
-            /* obj["my_rebalance_times"] = rebalance_times; */
-
         for (Index i = 0; i < nprocs; ++i)
         {
             rank_stats_json[i]["num_edges"] = std::vector(num_edges.begin() + i*num_graphs, num_edges.begin() + (i+1)*num_graphs);
@@ -610,37 +570,6 @@ void StatsCollector::write_json(const char *json_fname, MPI_Comm comm)
         f << std::setw(4) << result << std::endl;
         f.close();
     }
-
-
-
-    ///* input stats */
-    //const char *filename;
-    //int nprocs;
-    //Real cover;
-    //Index leaf_size;
-    //Index num_sites;
-    //bool random_sites;
-    //Index num_points;
-    //Index rebalance_rate;
-
-    ///* index_runtime stats */
-    //Real sep;
-    //Index farthest;
-    //Index my_num_ghost_points;
-    //Index my_num_assigned_trees;
-
-    //Real my_voronoi_time;
-    //Real my_ghost_points_time;
-    //Real my_exchange_points_time;
-    //Real my_tree_build_time;
-
-
-    /* if (!myrank) */
-    /* { */
-        /* std::ofstream f(stats_fname); */
-        /* f << std::setw(4) << stats << std::endl; */
-        /* f.close(); */
-    /* } */
 
     MPI_Type_free(&MPI_RANK_STATS);
 }
