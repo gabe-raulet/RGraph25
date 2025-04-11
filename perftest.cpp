@@ -31,6 +31,8 @@ Distance distance;
 
 void rebalance_trees(const GhostTree *send_trees, int sendcount, std::vector<GhostTree>& recv_trees, MPI_Comm comm);
 
+using DoubleVector = std::vector<double>;
+
 struct StatsCollector
 {
     /* input stats */
@@ -54,12 +56,30 @@ struct StatsCollector
     Index my_ghost_points_distcomps;
     Index my_tree_build_distcomps;
 
-    Real my_voronoi_time;
-    Real my_ghost_points_time;
-    Real my_exchange_points_time;
-    Real my_tree_build_time;
+    double my_voronoi_time;
+    double my_ghost_points_time;
+    double my_exchange_points_time;
+    double my_tree_build_time;
+
+    DoubleVector epsilons;
+    IndexVector num_rebalances;
+
+    IndexVector my_num_edges;
+    IndexVector my_distcomps;
+    DoubleVector my_query_times;
+    DoubleVector my_rebalance_times;
 
     void write_json(const char *json_fname, MPI_Comm comm);
+
+    void push_graph_stats(double epsilon, Index num_rebalances_count, Index my_n_edges, double my_query_time, double my_rebalance_time, Index mydistcomps)
+    {
+        epsilons.push_back(epsilon);
+        num_rebalances.push_back(num_rebalances_count);
+        my_num_edges.push_back(my_n_edges);
+        my_query_times.push_back(my_query_time);
+        my_rebalance_times.push_back(my_rebalance_time);
+        my_distcomps.push_back(mydistcomps);
+    }
 };
 
 int main(int argc, char *argv[])
@@ -275,10 +295,18 @@ int main(int argc, char *argv[])
 
         Index my_n_edges = 0, n_edges;
         int done = 0;
+
         Index num_rebalances = 0;
+        double my_query_time = 0;
+        double my_rebalance_time = 0;
+        mydistcomps = 0;
+
+        double t2;
 
         do
         {
+            t2 = -MPI_Wtime();
+
             const GhostTree *tree = trees.data();
             Index num_left = trees.size();
 
@@ -289,7 +317,12 @@ int main(int argc, char *argv[])
 
             done = !!(num_left == 0);
 
+            t2 += MPI_Wtime();
+            my_query_time += t2;
+
             MPI_Allreduce(MPI_IN_PLACE, &done, 1, MPI_INT, MPI_LAND, MPI_COMM_WORLD);
+
+            t2 = -MPI_Wtime();
 
             if (!done)
             {
@@ -298,6 +331,9 @@ int main(int argc, char *argv[])
                 std::swap(trees, recv_trees);
                 num_rebalances++;
             }
+
+            t2 += MPI_Wtime();
+            my_rebalance_time += t2;
 
         } while (!done);
 
@@ -313,6 +349,8 @@ int main(int argc, char *argv[])
         /* graph_runtime["epsilon"] = epsilon; */
         /* graph_runtime["num_edges"] = n_edges; */
         /* graph_runtime["num_rebalances"] = num_rebalances; */
+
+        stats.push_graph_stats(epsilon, num_rebalances, my_n_edges, my_query_time, my_rebalance_time, mydistcomps);
 
         if (sub_factor < 0) epsilon *= damping_factor;
         else epsilon -= sub_factor;
@@ -445,10 +483,17 @@ void StatsCollector::write_json(const char *json_fname, MPI_Comm comm)
         Index voronoi_distcomps;
         Index ghost_points_distcomps;
         Index tree_build_distcomps;
-        Real voronoi_time;
-        Real ghost_points_time;
-        Real exchange_points_time;
-        Real tree_build_time;
+
+        double voronoi_time;
+        double ghost_points_time;
+        double exchange_points_time;
+        double tree_build_time;
+
+        /* IndexVector num_edges; */
+        /* IndexVector distcomps; */
+
+        /* DoubleVector query_times; */
+        /* DoubleVector rebalance_times; */
 
         json get_json() const
         {
@@ -462,6 +507,13 @@ void StatsCollector::write_json(const char *json_fname, MPI_Comm comm)
             obj["ghost_points_time"] = ghost_points_time;
             obj["exchange_points_time"] = exchange_points_time;
             obj["tree_build_time"] = tree_build_time;
+
+            /* obj["my_num_edges"] = num_edges; */
+            /* obj["my_distcomps"] = distcomps; */
+
+            /* obj["my_query_times"] = query_times; */
+            /* obj["my_rebalance_times"] = rebalance_times; */
+
             return obj;
         }
     };
@@ -470,7 +522,7 @@ void StatsCollector::write_json(const char *json_fname, MPI_Comm comm)
 
     int blklens[2] = {5,4};
     MPI_Aint disps[2] = {offsetof(RankStats, num_ghost_points), offsetof(RankStats, voronoi_time)};
-    MPI_Datatype types[2] = {MPI_INT64_T, MPI_FLOAT};
+    MPI_Datatype types[2] = {MPI_INT64_T, MPI_DOUBLE};
     MPI_Type_create_struct(2, blklens, disps, types, &MPI_RANK_STATS);
     MPI_Type_commit(&MPI_RANK_STATS);
 
@@ -487,9 +539,30 @@ void StatsCollector::write_json(const char *json_fname, MPI_Comm comm)
     my_rank_stats.exchange_points_time = my_exchange_points_time;
     my_rank_stats.tree_build_time = my_tree_build_time;
 
-    if (!myrank) rank_stats.resize(nprocs);
+    /* my_rank_stats.num_edges = my_num_edges; */
+    /* my_rank_stats.distcomps = my_distcomps; */
+    /* my_rank_stats.query_times = my_query_times; */
+    /* my_rank_stats.rebalance_times = my_rebalance_times; */
+
+    IndexVector num_edges, distcomps;
+    DoubleVector query_times, rebalance_times;
+
+    if (!myrank)
+    {
+        rank_stats.resize(nprocs);
+
+        num_edges.resize(nprocs*num_graphs);
+        distcomps.resize(nprocs*num_graphs);
+        query_times.resize(nprocs*num_graphs);
+        rebalance_times.resize(nprocs*num_graphs);
+    }
 
     MPI_Gather(&my_rank_stats, 1, MPI_RANK_STATS, rank_stats.data(), 1, MPI_RANK_STATS, 0, comm);
+
+    MPI_Gather(my_num_edges.data(), static_cast<int>(num_graphs), MPI_INT64_T, num_edges.data(), static_cast<int>(num_graphs), MPI_INT64_T, 0, comm);
+    MPI_Gather(my_distcomps.data(), static_cast<int>(num_graphs), MPI_INT64_T, distcomps.data(), static_cast<int>(num_graphs), MPI_INT64_T, 0, comm);
+    MPI_Gather(my_query_times.data(), static_cast<int>(num_graphs), MPI_DOUBLE, query_times.data(), static_cast<int>(num_graphs), MPI_DOUBLE, 0, comm);
+    MPI_Gather(my_rebalance_times.data(), static_cast<int>(num_graphs), MPI_DOUBLE, rebalance_times.data(), static_cast<int>(num_graphs), MPI_DOUBLE, 0, comm);
 
     if (!myrank)
     {
@@ -505,12 +578,28 @@ void StatsCollector::write_json(const char *json_fname, MPI_Comm comm)
         stats_json["rebalance_rate"] = rebalance_rate;
         stats_json["sep"] = sep;
         stats_json["farthest"] = farthest;
+        stats_json["epsilsons"] = epsilons;
+        stats_json["num_rebalances"] = num_rebalances;
 
         std::vector<json> rank_stats_json;
 
         for (const RankStats& o : rank_stats)
         {
             rank_stats_json.push_back(o.get_json());
+        }
+
+            /* obj["my_num_edges"] = num_edges; */
+            /* obj["my_distcomps"] = distcomps; */
+
+            /* obj["my_query_times"] = query_times; */
+            /* obj["my_rebalance_times"] = rebalance_times; */
+
+        for (Index i = 0; i < nprocs; ++i)
+        {
+            rank_stats_json[i]["num_edges"] = std::vector(num_edges.begin() + i*num_graphs, num_edges.begin() + (i+1)*num_graphs);
+            rank_stats_json[i]["distcomps"] = std::vector(distcomps.begin() + i*num_graphs, distcomps.begin() + (i+1)*num_graphs);
+            rank_stats_json[i]["query_times"] = std::vector(query_times.begin() + i*num_graphs, query_times.begin() + (i+1)*num_graphs);
+            rank_stats_json[i]["rebalance_times"] = std::vector(rebalance_times.begin() + i*num_graphs, rebalance_times.begin() + (i+1)*num_graphs);
         }
 
         json result;
