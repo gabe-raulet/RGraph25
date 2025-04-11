@@ -262,8 +262,45 @@ Index GhostTree::graph_query(IndexVectorVector& graph, IndexVector& graphids, Re
     {
         graph.emplace_back();
         graphids.push_back(ids[i]);
-        n_edges += tree.range_query(graph.back(), points[i], radius, distcomps);
-        std::for_each(graph.back().begin(), graph.back().end(), [&](Index& id) { id = ids[id]; });
+
+        std::deque<Index> queue = {0};
+
+        while (!queue.empty())
+        {
+            Index u = queue.front(); queue.pop_front();
+            const auto& u_vtx = tree.vertices[u];
+            Index uid = u_vtx.index;
+
+            for (Index j = u_vtx.leaf_ptr; j < u_vtx.leaf_ptr + u_vtx.num_leaves; ++j)
+            {
+                if (ids[i] >= ids[tree.leaves[j]])
+                    continue;
+
+                if (distance(points[i], tree.leaf_points[j]) <= radius)
+                {
+                    graph.back().push_back(ids[tree.leaves[j]]);
+                }
+            }
+
+            distcomps += u_vtx.num_leaves;
+
+            for (Index j = u_vtx.child_ptr; j < u_vtx.child_ptr + u_vtx.num_children; ++j)
+            {
+                Index v = tree.children[j];
+                const auto& v_vtx = tree.vertices[v];
+                Index vid = v_vtx.index;
+                Point vpt = v_vtx.point;
+
+                if (distance(points[i], vpt) <= v_vtx.radius + radius)
+                {
+                    queue.push_back(v);
+                }
+            }
+
+            distcomps += u_vtx.num_children;
+        }
+
+        n_edges += graph.back().size();
     }
 
     return n_edges;
