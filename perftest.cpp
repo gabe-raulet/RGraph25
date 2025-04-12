@@ -189,6 +189,7 @@ int main(int argc, char *argv[])
 
     MPI_Reduce(&t, &maxtime, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
     if (!myrank) fmt::print("[time={:.3f}] built r-net Voronoi diagram [sep={:.3f},num_sites={},farthest={}]\n", maxtime, diagram.get_radius(), diagram.num_sites(), diagram.get_farthest());
+    std::cout << std::flush;
 
     stats.sep = diagram.get_radius();
     stats.farthest = diagram.get_farthest();
@@ -216,6 +217,7 @@ int main(int argc, char *argv[])
     MPI_Reduce(&stats.my_num_ghost_points, &num_ghost_points, 1, MPI_INT64_T, MPI_SUM, 0, MPI_COMM_WORLD);
 
     if (!myrank) fmt::print("[time={:.3f}] computed ghost points [treepts={},ghostpts={},pts_per_tree={:.1f},ghosts_per_tree={:.1f}]\n", maxtime, totsize, num_ghost_points, totsize/(num_sites+0.0), num_ghost_points/(num_sites+0.0));
+    std::cout << std::flush;
 
     /*
      * Exchange points
@@ -240,6 +242,7 @@ int main(int argc, char *argv[])
     tottime += maxtime;
 
     if (!myrank) fmt::print("[time={:.3f}] exchanged and repacked points alltoall\n", maxtime);
+    std::cout << std::flush;
 
     /*
      * Build ghost trees
@@ -271,6 +274,7 @@ int main(int argc, char *argv[])
     tottime += maxtime;
 
     if (!myrank) fmt::print("[time={:.3f}] computed ghost trees\n", maxtime);
+    std::cout << std::flush;
     stats.my_num_assigned_trees = s;
 
     /*
@@ -339,6 +343,7 @@ int main(int argc, char *argv[])
         Real density = (n_edges+0.0)/totsize;
 
         if (!myrank) fmt::print("[time={:.3f}] built epsilon graph [epsilon={:.3f},density={:.3f},edges={}]\n", maxtime, epsilon, density, n_edges);
+        std::cout << std::flush;
 
         stats.push_graph_stats(epsilon, num_rebalances, my_n_edges, my_query_time, my_rebalance_time, mydistcomps);
 
