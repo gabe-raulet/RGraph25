@@ -157,6 +157,8 @@ int main(int argc, char *argv[])
 
     assert((myoffset == myrank*(totsize/nprocs)));
 
+    num_sites *= nprocs;
+
     Index n = mypoints.size();
     Index m = num_sites;
 
